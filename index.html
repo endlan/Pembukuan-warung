@@ -531,21 +531,8 @@ function loadState() {
   if (raw) {
     try { state = JSON.parse(raw); } catch(e) {}
   }
-  // Default menus if empty
-  if (!state.menus || state.menus.length === 0) {
-    state.menus = [
-      { id: uid(), name: 'Seblak Original', toppings: [
-        { id: uid(), name: 'Baso', price: 3000 },
-        { id: uid(), name: 'Kerupuk', price: 2000 },
-        { id: uid(), name: 'Telur', price: 3000 },
-      ]},
-      { id: uid(), name: 'Seblak Pedas', toppings: [
-        { id: uid(), name: 'Baso', price: 3000 },
-        { id: uid(), name: 'Sosis', price: 4000 },
-        { id: uid(), name: 'Jamur', price: 1000 },
-      ]},
-    ];
-  }  // Migrate old structure: add toppings array if missing
+  if (!state.menus) state.menus = [];
+  // Migrate old structure: add toppings array if missing
   state.menus = state.menus.map(m => ({ id: m.id, name: m.name, toppings: m.toppings || [] }));
   if (!state.toppings) state.toppings = [];
   if (!state.orders) state.orders = [];
@@ -555,6 +542,11 @@ function loadState() {
 }
 
 function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2); }
+
+// ===== SORT HELPER =====
+function sortByName(arr) {
+  return [...arr].sort((a, b) => a.name.localeCompare(b.name, 'id', { sensitivity: 'base' }));
+}
 
 // ===== FORMAT =====
 function rp(num) { return 'Rp ' + Number(num||0).toLocaleString('id-ID'); }
@@ -607,7 +599,7 @@ function renderOrderMenuList() {
     el.innerHTML = '<div class="empty"><div class="empty-icon">🍽️</div>Belum ada menu. Tambah menu dulu di ⚙️ Menu.</div>';
     return;
   }
-  el.innerHTML = state.menus.map(m => {
+  el.innerHTML = sortByName(state.menus).map(m => {
     const sel = selectedMenus[m.id];
     const isSelected = !!sel;
     const qty = sel ? sel.qty : 1;
@@ -632,7 +624,7 @@ function renderOrderMenuList() {
       <div class="card" style="margin-top:-6px;border-radius:0 0 10px 10px;padding:10px 14px;">
         <div style="font-size:11px;color:var(--gray);margin-bottom:6px;font-weight:600;">TOPPING</div>
         <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;">
-        ${m.toppings.map(t => {
+        ${sortByName(m.toppings).map(t => {
           const tQty = toppings[t.id] || 0;
           const isTopSelected = tQty > 0;
           return `
@@ -922,7 +914,7 @@ function renderBulanan() {
 
   const totalPenjualan = orders.filter(o => o.status==='bayar').reduce((s,o) => s+o.grandTotal, 0);
   const totalGratis = orders.filter(o => o.status==='gratis').reduce((s,o) => s+o.grandTotal, 0);
-  const hargaAsliTerjual = orders.filter(o => o.status==='bayar').reduce((s,o) => s+(o.grandAsli||0), 0);
+  const hargaAsliTerjual = orders.reduce((s,o) => s+(o.grandAsli||0), 0);
   const totalModalBelanja = state.modals.filter(m => {
     const d = new Date(m.date);
     return d.getMonth()===month && d.getFullYear()===year;
@@ -1021,14 +1013,29 @@ function deleteOrderFromBulanan(orderId, date) {
 }
 
 // ===== STOK TOPPING =====
-function getAllToppings() {
-  const map = {};
+function getToppingGroups() {
+  // Groups toppings by name (case-insensitive, trimmed) so the same item
+  // shared across menus (e.g. "baso" in 2 menus) is treated as one stock item.
+  // Each group "lives" under the menu where it first appears.
+  const groups = {};
+  const order = [];
   state.menus.forEach(m => {
     m.toppings.forEach(t => {
-      if (!map[t.id]) map[t.id] = { id: t.id, name: t.name };
+      const key = t.name.trim().toLowerCase();
+      if (!groups[key]) {
+        groups[key] = { key, name: t.name, ids: [t.id], menuId: m.id };
+        order.push(key);
+      } else if (!groups[key].ids.includes(t.id)) {
+        groups[key].ids.push(t.id);
+      }
     });
   });
-  return Object.values(map);
+  return order.map(k => groups[k]);
+}
+
+function getAllToppings() {
+  // Kept for compatibility with any other caller; returns one entry per group.
+  return getToppingGroups().map(g => ({ id: g.ids[0], name: g.name }));
 }
 
 function getTerjual(toppingId) {
@@ -1043,12 +1050,17 @@ function getTerjual(toppingId) {
   return total;
 }
 
+function getTerjualGroup(ids) {
+  return ids.reduce((sum, id) => sum + getTerjual(id), 0);
+}
+
 function renderStok(editMode = false) {
-  const toppings = getAllToppings();
-  if (toppings.length === 0) {
+  const groups = getToppingGroups();
+  if (groups.length === 0) {
     document.getElementById('stok-list').innerHTML = '<div class="empty"><div class="empty-icon">📦</div>Belum ada topping.</div>';
     return;
   }
+  const menus = sortByName(state.menus);
   document.getElementById('stok-list').innerHTML = `
     <div style="text-align:right;margin-bottom:8px;">
       ${editMode
@@ -1057,43 +1069,60 @@ function renderStok(editMode = false) {
         : `<button class="btn btn-primary" onclick="renderStok(true)">✏️ Edit Stok</button>`
       }
     </div>
-    ${toppings.map(t => {
-      const stokData = state.stocks[t.id] || { total: 0, riwayat: [] };
-      const terjual = getTerjual(t.id);
-      const sisa = stokData.total - terjual;
-      const sisaColor = sisa <= 0 ? '#ff7c7c' : sisa <= 5 ? 'var(--yellow)' : 'var(--green)';
+    ${menus.map(m => {
+      const menuGroups = sortByName(groups.filter(g => g.menuId === m.id));
       return `
-      <div class="card" style="margin-bottom:8px;">
-        <div style="font-size:14px;font-weight:700;margin-bottom:8px;">${t.name}</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;text-align:center;">
-          <div style="background:#f5f5f5;border-radius:8px;padding:8px;">
-            <div style="font-size:10px;color:var(--gray);margin-bottom:4px;">STOK</div>
-            ${editMode
-              ? `<input type="number" id="stok-input-${t.id}" value="${stokData.total}" min="0"
-                   style="width:100%;border:2px solid var(--primary);border-radius:6px;padding:4px;font-size:16px;font-weight:800;text-align:center;background:#fff;">`
-              : `<div style="font-size:16px;font-weight:800;">${stokData.total}</div>`
-            }
-          </div>
-          <div style="background:#f5f5f5;border-radius:8px;padding:8px;">
-            <div style="font-size:10px;color:var(--gray);margin-bottom:2px;">TERJUAL</div>
-            <div style="font-size:16px;font-weight:800;color:var(--red);">${terjual}</div>
-          </div>
-          <div style="background:#f5f5f5;border-radius:8px;padding:8px;">
-            <div style="font-size:10px;color:var(--gray);margin-bottom:2px;">SISA</div>
-            <div style="font-size:16px;font-weight:800;color:${sisaColor};">${sisa}</div>
-          </div>
-        </div>
+      <div style="margin-bottom:18px;">
+        <div style="background:var(--dark);color:#fff;font-size:12px;font-weight:800;letter-spacing:1px;text-transform:uppercase;padding:8px 12px;border-radius:8px;margin-bottom:8px;">${m.name}</div>
+        ${menuGroups.length === 0 ? '<div style="font-size:12px;color:var(--gray);margin-bottom:8px;">Belum ada topping/barang</div>' :
+          menuGroups.map(g => {
+            const canonicalId = g.ids[0];
+            const stokData = state.stocks[canonicalId] || { total: 0, riwayat: [] };
+            const terjual = getTerjualGroup(g.ids);
+            const sisa = stokData.total - terjual;
+            const sisaColor = sisa <= 0 ? '#ff7c7c' : sisa <= 5 ? 'var(--yellow)' : 'var(--green)';
+            return `
+            <div class="card" style="margin-bottom:8px;">
+              <div style="font-size:14px;font-weight:700;margin-bottom:8px;">${g.name}</div>
+              <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;text-align:center;">
+                <div style="background:#f5f5f5;border-radius:8px;padding:8px;">
+                  <div style="font-size:10px;color:var(--gray);margin-bottom:4px;">STOK</div>
+                  ${editMode
+                    ? `<input type="number" id="stok-input-${canonicalId}" value="${stokData.total}" min="0"
+                         style="width:100%;border:2px solid var(--primary);border-radius:6px;padding:4px;font-size:16px;font-weight:800;text-align:center;background:#fff;">`
+                    : `<div style="font-size:16px;font-weight:800;">${stokData.total}</div>`
+                  }
+                </div>
+                <div style="background:#f5f5f5;border-radius:8px;padding:8px;">
+                  <div style="font-size:10px;color:var(--gray);margin-bottom:2px;">TERJUAL</div>
+                  <div style="font-size:16px;font-weight:800;color:var(--red);">${terjual}</div>
+                </div>
+                <div style="background:#f5f5f5;border-radius:8px;padding:8px;">
+                  <div style="font-size:10px;color:var(--gray);margin-bottom:2px;">SISA</div>
+                  <div style="font-size:16px;font-weight:800;color:${sisaColor};">${sisa}</div>
+                </div>
+              </div>
+            </div>`;
+          }).join('')}
       </div>`;
     }).join('')}
   `;
 }
 
 function simpanEditStok() {
-  const toppings = getAllToppings();
-  toppings.forEach(t => {
-    const val = parseInt(document.getElementById(`stok-input-${t.id}`).value) || 0;
-    if (!state.stocks[t.id]) state.stocks[t.id] = { total: 0, riwayat: [] };
-    state.stocks[t.id].total = val;
+  const groups = getToppingGroups();
+  groups.forEach(g => {
+    const canonicalId = g.ids[0];
+    const input = document.getElementById(`stok-input-${canonicalId}`);
+    if (!input) return;
+    const val = parseInt(input.value) || 0;
+    if (!state.stocks[canonicalId]) state.stocks[canonicalId] = { total: 0, riwayat: [] };
+    state.stocks[canonicalId].total = val;
+    // Keep other ids sharing this name in sync at 0 so totals never double-count.
+    g.ids.slice(1).forEach(otherId => {
+      if (!state.stocks[otherId]) state.stocks[otherId] = { total: 0, riwayat: [] };
+      state.stocks[otherId].total = 0;
+    });
   });
   saveState();
   renderStok(false);
@@ -1131,12 +1160,13 @@ function renderModal() {
     const d = new Date(m.date);
     return d.getMonth()===month && d.getFullYear()===year;
   });
-  const orders = state.orders.filter(o => {
+  const allOrders = state.orders.filter(o => {
     const d = new Date(o.date);
-    return d.getMonth()===month && d.getFullYear()===year && o.status==='bayar';
+    return d.getMonth()===month && d.getFullYear()===year;
   });
+  const orders = allOrders.filter(o => o.status==='bayar');
   const totalModalManual = modals.reduce((s,m) => s+m.amount, 0);
-  const hargaAsliTerjual = orders.reduce((s,o) => s+(o.grandAsli||0), 0);
+  const hargaAsliTerjual = allOrders.reduce((s,o) => s+(o.grandAsli||0), 0);
   const totalDikurang = totalModalManual + hargaAsliTerjual;
   const totalPenjualan = orders.reduce((s,o) => s+o.grandTotal, 0);
   const laba = totalPenjualan - totalDikurang;
@@ -1230,7 +1260,7 @@ function deleteModal(id) {
 function renderMenuSettings() {
   document.getElementById('menu-list-settings').innerHTML = state.menus.length === 0
     ? '<div class="empty"><div class="empty-icon">🍽️</div>Belum ada menu.</div>'
-    : state.menus.map(m => `
+    : sortByName(state.menus).map(m => `
       <div class="card" style="margin-bottom:10px;">
         <div class="card-row" style="margin-bottom:8px;">
           <div style="font-weight:700;font-size:15px;">🍽️ ${m.name}</div>
@@ -1241,7 +1271,7 @@ function renderMenuSettings() {
         </div>
         <div style="font-size:11px;color:var(--gray);margin-bottom:8px;text-transform:uppercase;letter-spacing:1px;font-weight:600;">Topping (${m.toppings.length})</div>
         ${m.toppings.length === 0 ? '<div style="font-size:12px;color:var(--gray);margin-bottom:8px;">Belum ada topping</div>' :
-          m.toppings.map(t => `
+          sortByName(m.toppings).map(t => `
             <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);">
               <div>
                 <span style="font-size:13px;font-weight:600;">${t.name}</span>
@@ -1297,17 +1327,18 @@ function openAddTopping(menuId) {
   document.getElementById('add-topping-menu-id').value = menuId;
   document.getElementById('add-topping-name').value = '';
   document.getElementById('add-topping-price').value = '';
+  document.getElementById('add-topping-asli').value = '';
   openModal('modal-add-topping');
 }
 function saveAddTopping() {
   const menuId = document.getElementById('add-topping-menu-id').value;
   const name = document.getElementById('add-topping-name').value.trim();
   const price = parseFloat(document.getElementById('add-topping-price').value)||0;
-  const modal = parseFloat(document.getElementById('add-topping-asli').value)||0;
+  const asli = parseFloat(document.getElementById('add-topping-asli').value)||0;
   if (!name) { toast('Isi nama topping!'); return; }
   const idx = state.menus.findIndex(x => x.id === menuId);
   if (idx < 0) return;
-  state.menus[idx].toppings.push({ id: uid(), name, price, modal });
+  state.menus[idx].toppings.push({ id: uid(), name, price, asli });
   saveState();
   closeModal('modal-add-topping');
   renderMenuSettings();
