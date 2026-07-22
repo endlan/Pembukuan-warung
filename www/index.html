@@ -958,9 +958,28 @@ function renderBulanan() {
     const dayOrders = dayData.orders;
     const dayModals = dayData.modals;
     const dayModalTotal = dayModals.reduce((s,m)=>s+m.amount,0);
-    const dayTotal = dayOrders.filter(o=>o.status==='bayar').reduce((s,o)=>s+o.grandTotal,0);
-    const dayGratis = dayOrders.filter(o=>o.status==='gratis').reduce((s,o)=>s+o.grandTotal,0);
+    const dayBayarOrders = dayOrders.filter(o=>o.status==='bayar');
+    const dayGratisOrders = dayOrders.filter(o=>o.status==='gratis');
+    const dayTotal = dayBayarOrders.reduce((s,o)=>s+o.grandTotal,0);
+    const dayGratis = dayGratisOrders.reduce((s,o)=>s+o.grandTotal,0);
+    const dayModalTerjual = dayBayarOrders.reduce((s,o)=>s+(o.grandAsli||0),0);
+    const dayModalGratis = dayGratisOrders.reduce((s,o)=>s+(o.grandAsli||0),0);
+    const dayLaba = dayTotal - dayModalTerjual - dayModalGratis - dayModalTotal;
     const id = 'day-' + date.replace(/-/g,'');
+    const detailId = 'detail-' + date.replace(/-/g,'');
+
+    const itemAgg = {};
+    dayBayarOrders.forEach(o => {
+      o.items.forEach(item => {
+        if (!itemAgg[item.menuName]) itemAgg[item.menuName] = { qty: 0, total: 0 };
+        itemAgg[item.menuName].qty += item.qty;
+        itemAgg[item.menuName].total += item.totalPrice;
+      });
+    });
+    const itemAggRows = Object.entries(itemAgg).map(([name, v]) => `
+      <div style="display:flex;justify-content:space-between;font-size:13px;padding:3px 0;">
+        <span>${name} ×${v.qty}</span><span>${rp(v.total)}</span>
+      </div>`).join('');
 
     const renderOrderItem = o => `
       <div class="order-item">
@@ -992,34 +1011,53 @@ function renderBulanan() {
           <div style="font-size:11px;color:var(--gray);margin-top:2px;">${dayOrders.length} order · Gratis ${rp(dayGratis)}${dayModalTotal>0?` · Pengeluaran ${rp(dayModalTotal)}`:''}</div>
         </div>
         <div style="text-align:right;">
-          <div style="font-weight:800;color:var(--green);font-size:15px;">${rp(dayTotal)}</div>
+          <div style="font-size:11px;color:var(--gray);">${rp(dayTotal)}</div>
+          <div style="font-weight:800;color:${dayLaba>=0?'var(--green)':'var(--red)'};font-size:15px;">${rp(dayLaba)}</div>
           <div style="font-size:11px;color:var(--gray);">▼</div>
         </div>
       </div>
       <div class="day-content" id="${id}">
-        ${bayarOrders.length > 0 ? `
-          <div style="font-size:11px;font-weight:700;color:var(--green);margin-bottom:4px;letter-spacing:0.5px;">✅ BAYAR (${bayarOrders.length} order)</div>
-          ${bayarOrders.map(renderOrderItem).join('')}
-        ` : ''}
-        ${gratisOrders.length > 0 ? `
-          <div style="font-size:11px;font-weight:700;color:var(--yellow);margin-top:6px;margin-bottom:4px;letter-spacing:0.5px;">🎁 GRATIS (${gratisOrders.length} order)</div>
-          ${gratisOrders.map(renderOrderItem).join('')}
-        ` : ''}
-        ${dayModals.length > 0 ? `
-          <div style="font-size:11px;font-weight:700;color:var(--red);margin-top:6px;margin-bottom:4px;letter-spacing:0.5px;">💸 PENGELUARAN MANUAL (${dayModals.length})</div>
-          ${dayModals.map(m => `
-            <div class="order-item" style="display:flex;justify-content:space-between;align-items:center;">
-              <div>
-                <div style="font-size:13px;font-weight:600;">${m.desc}</div>
-                <div style="font-size:11px;color:var(--gray);">Pengeluaran manual</div>
+        <div style="font-size:11px;font-weight:700;color:var(--gray);margin-bottom:4px;letter-spacing:0.5px;">RINGKASAN</div>
+        ${itemAggRows || '<div style="font-size:12px;color:var(--gray);padding:3px 0;">Tidak ada barang terjual.</div>'}
+        <div style="border-top:1px solid var(--border,#e5e5e5);margin-top:6px;padding-top:6px;display:flex;justify-content:space-between;font-size:13px;font-weight:700;">
+          <span>Penghasilan</span><span>${rp(dayTotal)}</span>
+        </div>
+        <div style="margin-top:6px;">
+          ${dayModalTerjual>0?`<div style="display:flex;justify-content:space-between;font-size:13px;color:var(--red);padding:2px 0;"><span>Modal barang terjual</span><span>- ${rp(dayModalTerjual)}</span></div>`:''}
+          ${dayModalGratis>0?`<div style="display:flex;justify-content:space-between;font-size:13px;color:var(--red);padding:2px 0;"><span>Modal barang gratis</span><span>- ${rp(dayModalGratis)}</span></div>`:''}
+          ${dayModalTotal>0?`<div style="display:flex;justify-content:space-between;font-size:13px;color:var(--red);padding:2px 0;"><span>Pengeluaran manual</span><span>- ${rp(dayModalTotal)}</span></div>`:''}
+        </div>
+        <div style="border-top:1px solid var(--border,#e5e5e5);margin-top:6px;padding-top:6px;display:flex;justify-content:space-between;font-size:14px;font-weight:800;">
+          <span>Pendapatan bersih</span><span style="color:${dayLaba>=0?'var(--green)':'var(--red)'};">${rp(dayLaba)}</span>
+        </div>
+
+        <button class="btn btn-sm" style="width:100%;margin-top:10px;" onclick="toggleDay('${detailId}')">Lihat detail order</button>
+
+        <div class="day-content" id="${detailId}" style="margin-top:8px;border-top:none;">
+          ${dayBayarOrders.length > 0 ? `
+            <div style="font-size:11px;font-weight:700;color:var(--green);margin-bottom:4px;letter-spacing:0.5px;">✅ BAYAR (${dayBayarOrders.length} order)</div>
+            ${dayBayarOrders.map(renderOrderItem).join('')}
+          ` : ''}
+          ${dayGratisOrders.length > 0 ? `
+            <div style="font-size:11px;font-weight:700;color:var(--yellow);margin-top:6px;margin-bottom:4px;letter-spacing:0.5px;">🎁 GRATIS (${dayGratisOrders.length} order)</div>
+            ${dayGratisOrders.map(renderOrderItem).join('')}
+          ` : ''}
+          ${dayModals.length > 0 ? `
+            <div style="font-size:11px;font-weight:700;color:var(--red);margin-top:6px;margin-bottom:4px;letter-spacing:0.5px;">💸 PENGELUARAN MANUAL (${dayModals.length})</div>
+            ${dayModals.map(m => `
+              <div class="order-item" style="display:flex;justify-content:space-between;align-items:center;">
+                <div>
+                  <div style="font-size:13px;font-weight:600;">${m.desc}</div>
+                  <div style="font-size:11px;color:var(--gray);">Pengeluaran manual</div>
+                </div>
+                <div style="display:flex;align-items:center;gap:8px;">
+                  <span style="font-size:13px;font-weight:700;color:var(--red);">${rp(m.amount)}</span>
+                  <button class="btn btn-sm btn-delete" onclick="deleteBulananPengeluaran('${m.id}')">Hapus</button>
+                </div>
               </div>
-              <div style="display:flex;align-items:center;gap:8px;">
-                <span style="font-size:13px;font-weight:700;color:var(--red);">${rp(m.amount)}</span>
-                <button class="btn btn-sm btn-delete" onclick="deleteBulananPengeluaran('${m.id}')">Hapus</button>
-              </div>
-            </div>
-          `).join('')}
-        ` : ''}
+            `).join('')}
+          ` : ''}
+        </div>
       </div>
     </div>`;
   }).join('');
