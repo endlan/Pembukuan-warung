@@ -1,0 +1,1439 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Catatan Jualan</title>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #f5f4f0;
+    --white: #ffffff;
+    --dark: #1c1c1e;
+    --dark2: #2c2c2e;
+    --accent: #e86c3a;
+    --accent2: #f0a070;
+    --green: #2e7d32;
+    --green-bg: #e8f5e9;
+    --red: #c62828;
+    --red-bg: #ffebee;
+    --yellow: #f57f17;
+    --yellow-bg: #fffde7;
+    --gray: #8e8e93;
+    --border: #e0ddd6;
+    --shadow: 0 2px 12px rgba(0,0,0,0.08);
+  }
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  body { font-family:'Plus Jakarta Sans',sans-serif; background:var(--bg); color:var(--dark); min-height:100vh; }
+  
+  /* Pages */
+  .page { display:none; min-height:100vh; padding-bottom:80px; }
+  .page.active { display:block; }
+
+  /* Header */
+  .header {
+    background:var(--dark);
+    color:#fff;
+    padding:16px 20px 14px;
+    position:sticky; top:0; z-index:50;
+    display:flex; align-items:center; gap:12px;
+  }
+  .header-back { background:none; border:none; color:#fff; font-size:20px; cursor:pointer; padding:4px; }
+  .header-title { font-size:17px; font-weight:700; flex:1; }
+  .header-sub { font-size:11px; color:rgba(255,255,255,0.5); letter-spacing:2px; text-transform:uppercase; }
+
+  /* Bottom Nav */
+  .bottom-nav {
+    position:fixed; bottom:0; left:0; right:0;
+    background:var(--white); border-top:1px solid var(--border);
+    display:flex; z-index:100; padding-bottom:env(safe-area-inset-bottom);
+  }
+  .nav-btn {
+    flex:1; padding:10px 0 8px; border:none; background:none; cursor:pointer;
+    display:flex; flex-direction:column; align-items:center; gap:3px;
+    border-top:2.5px solid transparent; transition:all 0.2s;
+  }
+  .nav-btn.active { border-top-color:var(--accent); }
+  .nav-btn .nav-icon { font-size:20px; }
+  .nav-btn .nav-label { font-size:10px; color:var(--gray); font-weight:500; }
+  .nav-btn.active .nav-label { color:var(--accent); font-weight:700; }
+
+  /* Cards */
+  .card {
+    background:var(--white); border-radius:12px; padding:14px 16px;
+    box-shadow:var(--shadow); margin-bottom:10px;
+  }
+  .card-row { display:flex; justify-content:space-between; align-items:center; }
+
+  /* Buttons */
+  .btn {
+    border:none; border-radius:10px; cursor:pointer;
+    font-family:'Plus Jakarta Sans',sans-serif; font-weight:600;
+    transition:all 0.15s; display:inline-flex; align-items:center; justify-content:center; gap:6px;
+  }
+  .btn-primary { background:var(--dark); color:#fff; padding:13px 20px; font-size:14px; width:100%; }
+  .btn-primary:active { transform:scale(0.98); }
+  .btn-accent { background:var(--accent); color:#fff; padding:13px 20px; font-size:14px; width:100%; }
+  .btn-sm { padding:5px 12px; font-size:12px; }
+  .btn-edit { background:#f0f0f0; color:var(--dark); }
+  .btn-delete { background:var(--red-bg); color:var(--red); }
+  .btn-green { background:var(--green-bg); color:var(--green); }
+  .btn-outline { background:transparent; border:1.5px solid var(--border); color:var(--gray); padding:11px 20px; font-size:13px; width:100%; }
+
+  /* Form */
+  .form-group { margin-bottom:14px; }
+  .form-label { font-size:11px; color:var(--gray); display:block; margin-bottom:5px; text-transform:uppercase; letter-spacing:1px; font-weight:600; }
+  .form-input {
+    width:100%; border:1.5px solid var(--border); border-radius:10px;
+    padding:11px 14px; font-size:14px; font-family:'Plus Jakarta Sans',sans-serif;
+    background:var(--bg); outline:none; transition:border 0.2s;
+  }
+  .form-input:focus { border-color:var(--accent); }
+  .form-select {
+    width:100%; border:1.5px solid var(--border); border-radius:10px;
+    padding:11px 14px; font-size:14px; font-family:'Plus Jakarta Sans',sans-serif;
+    background:var(--bg); outline:none;
+  }
+
+  /* Badge */
+  .badge { display:inline-block; padding:3px 10px; border-radius:20px; font-size:11px; font-weight:700; }
+  .badge-green { background:var(--green-bg); color:var(--green); }
+  .badge-red { background:var(--red-bg); color:var(--red); }
+  .badge-yellow { background:var(--yellow-bg); color:var(--yellow); }
+  .badge-gray { background:#f0f0f0; color:var(--gray); }
+
+  /* Section title */
+  .section-title { font-size:11px; color:var(--gray); text-transform:uppercase; letter-spacing:1.5px; font-weight:700; margin:18px 0 8px; }
+
+  /* Checkbox item */
+  .menu-item {
+    background:var(--white); border-radius:10px; padding:12px 14px;
+    margin-bottom:8px; display:flex; align-items:center; gap:12px;
+    box-shadow:0 1px 4px rgba(0,0,0,0.06); cursor:pointer;
+  }
+  .menu-item.selected { border:2px solid var(--accent); }
+  .check-circle {
+    width:22px; height:22px; border-radius:50%; border:2px solid var(--border);
+    display:flex; align-items:center; justify-content:center; flex-shrink:0;
+    transition:all 0.2s;
+  }
+  .menu-item.selected .check-circle { background:var(--accent); border-color:var(--accent); color:#fff; font-size:13px; }
+  .menu-name { flex:1; font-size:14px; font-weight:600; }
+  .menu-price { font-size:13px; color:var(--gray); }
+
+  /* Qty control */
+  .qty-control { display:flex; align-items:center; gap:8px; }
+  .qty-btn { width:28px; height:28px; border-radius:8px; border:1.5px solid var(--border); background:var(--bg); font-size:16px; cursor:pointer; display:flex; align-items:center; justify-content:center; font-weight:700; }
+  .qty-val { font-size:15px; font-weight:700; min-width:24px; text-align:center; }
+
+  /* Topping section */
+  .topping-item {
+    display:flex; align-items:center; gap:10px; padding:8px 0;
+    border-bottom:1px solid var(--border); cursor:pointer;
+  }
+  .topping-item:last-child { border-bottom:none; }
+  .topping-check { width:18px; height:18px; border-radius:5px; border:2px solid var(--border); display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+  .topping-item.selected .topping-check { background:var(--accent); border-color:var(--accent); color:#fff; font-size:11px; }
+
+  /* Summary bar */
+  .summary-bar {
+    position:sticky; bottom:72px; left:0; right:0;
+    background:var(--dark); color:#fff; padding:12px 20px;
+    display:flex; justify-content:space-between; align-items:center;
+    z-index:40;
+  }
+
+  /* Toast */
+  .toast {
+    position:fixed; bottom:90px; left:50%; transform:translateX(-50%) translateY(20px);
+    background:var(--dark); color:#fff; padding:10px 20px; border-radius:20px;
+    font-size:13px; z-index:999; opacity:0; transition:all 0.3s; pointer-events:none;
+    white-space:nowrap; box-shadow:0 4px 16px rgba(0,0,0,0.2);
+  }
+  .toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+
+  /* Modal */
+  .modal-overlay {
+    position:fixed; inset:0; background:rgba(0,0,0,0.5);
+    z-index:200; display:none; align-items:flex-end; justify-content:center;
+  }
+  .modal-overlay.show { display:flex; }
+  .modal {
+    background:var(--white); border-radius:20px 20px 0 0;
+    padding:20px; width:100%; max-height:80vh; overflow-y:auto;
+  }
+  .modal-title { font-size:16px; font-weight:700; margin-bottom:16px; }
+
+  /* Reminder */
+  .reminder-overlay {
+    position:fixed; inset:0; background:rgba(0,0,0,0.6);
+    z-index:300; display:none; align-items:center; justify-content:center; padding:24px;
+  }
+  .reminder-overlay.show { display:flex; }
+  .reminder-box {
+    background:var(--white); border-radius:20px; padding:28px 24px; text-align:center;
+    max-width:320px; width:100%;
+  }
+  .reminder-icon { font-size:48px; margin-bottom:12px; }
+  .reminder-title { font-size:18px; font-weight:800; margin-bottom:8px; }
+  .reminder-text { font-size:14px; color:var(--gray); margin-bottom:20px; line-height:1.5; }
+
+  /* Collapsible */
+  .day-group { margin-bottom:10px; }
+  .day-header {
+    background:var(--white); border-radius:10px; padding:12px 16px;
+    display:flex; justify-content:space-between; align-items:center;
+    cursor:pointer; box-shadow:0 1px 4px rgba(0,0,0,0.06);
+  }
+  .day-header.open { border-radius:10px 10px 0 0; }
+  .day-content { background:var(--white); border-radius:0 0 10px 10px; border-top:1px solid var(--border); overflow:hidden; display:none; }
+  .day-content.open { display:block; }
+  .order-item { padding:12px 16px; border-bottom:1px solid var(--border); }
+  .order-item:last-child { border-bottom:none; }
+
+  /* Stat cards */
+  .stat-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:10px; }
+  .stat-card { background:var(--white); border-radius:12px; padding:14px; box-shadow:var(--shadow); }
+  .stat-label { font-size:11px; color:var(--gray); margin-bottom:4px; }
+  .stat-value { font-size:17px; font-weight:800; }
+  .stat-card.full { grid-column:1/-1; background:var(--dark); color:#fff; }
+  .stat-card.full .stat-label { color:rgba(255,255,255,0.5); }
+
+  /* Padding wrapper */
+  .px { padding:0 16px; }
+  .py { padding:16px 0; }
+
+  /* Divider */
+  .divider { height:1px; background:var(--border); margin:12px 0; }
+
+  /* Empty state */
+  .empty { text-align:center; color:var(--gray); padding:50px 20px; font-size:14px; }
+  .empty-icon { font-size:40px; margin-bottom:10px; }
+
+  /* Scrollable content */
+  .scroll-content { padding:16px; }
+
+  /* Order detail in order page */
+  .order-detail-item { display:flex; justify-content:space-between; align-items:flex-start; padding:10px 0; border-bottom:1px solid var(--border); }
+  .order-detail-item:last-child { border-bottom:none; }
+
+  .input-row { display:flex; gap:8px; }
+  .input-row .form-group { flex:1; }
+</style>
+</head>
+<body>
+
+<!-- ===== PAGE: ORDER (1A) ===== -->
+<div class="page active" id="page-order">
+  <div class="header">
+    <div>
+      <div class="header-sub">Kasir</div>
+      <div class="header-title">Tambah Order</div>
+    </div>
+    <button class="btn btn-sm btn-edit" onclick="showPage('page-menu-settings')" style="margin-left:auto">⚙️ Menu</button>
+  </div>
+  <div class="scroll-content">
+    <div class="section-title">Pilih Menu</div>
+    <div id="order-menu-list"></div>
+    <div class="section-title">Status Pembayaran</div>
+    <div style="display:flex; gap:8px; margin-bottom:16px;">
+      <button class="btn btn-sm" id="btn-bayar" onclick="setPayStatus('bayar')" style="flex:1;padding:10px;border-radius:10px;background:var(--dark);color:#fff;border:none;font-family:'Plus Jakarta Sans',sans-serif;font-weight:600;">✅ Bayar</button>
+      <button class="btn btn-sm" id="btn-gratis" onclick="setPayStatus('gratis')" style="flex:1;padding:10px;border-radius:10px;background:#f0f0f0;color:var(--gray);border:none;font-family:'Plus Jakarta Sans',sans-serif;font-weight:600;">🎁 Gratis</button>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Catatan (opsional)</label>
+      <input type="text" class="form-input" id="order-note" placeholder="Misal: tidak pedas">
+    </div>
+    <button class="btn btn-accent" onclick="submitOrder()">✓ Selesai — Simpan Order</button>
+  </div>
+</div>
+
+<!-- ===== PAGE: REKAP HARIAN (1B) ===== -->
+<div class="page" id="page-harian">
+  <div class="header">
+    <div>
+      <div class="header-sub">Laporan</div>
+      <div class="header-title">Rekap Harian</div>
+    </div>
+  </div>
+  <div class="scroll-content">
+    <input type="hidden" id="filter-date">
+    <div id="harian-stats"></div>
+
+    <div class="section-title">Pengeluaran Hari Ini</div>
+    <div class="card" id="harian-pengeluaran-form">
+      <div class="input-row">
+        <div class="form-group" style="flex:2">
+          <label class="form-label">Keterangan</label>
+          <input type="text" class="form-input" id="harian-pengeluaran-desc" placeholder="Misal: Pengamen, sumbangan...">
+        </div>
+        <div class="form-group" style="flex:1">
+          <label class="form-label">Jumlah (Rp)</label>
+          <input type="number" class="form-input" id="harian-pengeluaran-amount" placeholder="0">
+        </div>
+      </div>
+      <button class="btn btn-primary" onclick="submitHarianPengeluaran()">+ Catat Pengeluaran</button>
+    </div>
+    <div id="harian-pengeluaran-list"></div>
+
+    <div class="section-title">Detail Order</div>
+    <div id="harian-list"></div>
+  </div>
+</div>
+
+<!-- ===== PAGE: REKAP BULANAN (2) ===== -->
+<div class="page" id="page-bulanan">
+  <div class="header">
+    <div>
+      <div class="header-sub">Laporan</div>
+      <div class="header-title">Rekap Bulanan</div>
+    </div>
+  </div>
+  <div class="scroll-content">
+    <div style="display:flex; gap:8px; margin-bottom:16px;">
+      <select class="form-select" id="filter-month" onchange="renderBulanan()" style="flex:1;"></select>
+      <select class="form-select" id="filter-year" onchange="renderBulanan()" style="width:90px;"></select>
+    </div>
+    <div style="margin-bottom:16px;">
+      <select class="form-select" id="filter-day" onchange="renderBulanan()" style="width:100%;">
+        <option value="">— Semua Tanggal —</option>
+      </select>
+    </div>
+    <div id="bulanan-stats"></div>
+    <div class="section-title">Per Hari</div>
+    <div id="bulanan-list"></div>
+  </div>
+</div>
+
+<!-- ===== PAGE: MODAL & KEUANGAN (3) ===== -->
+<div class="page" id="page-modal">
+  <div class="header">
+    <div>
+      <div class="header-sub">Keuangan</div>
+      <div class="header-title">Modal & Pengeluaran</div>
+    </div>
+  </div>
+  <div class="scroll-content">
+    <input type="hidden" id="modal-filter-month">
+    <input type="hidden" id="modal-filter-year">
+
+    <div class="section-title">Stok Topping</div>
+    <div id="stok-list"></div>
+
+    <input type="hidden" id="pengeluaran-date">
+    <input type="hidden" id="pengeluaran-desc">
+    <input type="hidden" id="pengeluaran-amount">
+    <div id="modal-summary" style="display:none"></div>
+    <div id="modal-list" style="display:none"></div>
+  </div>
+</div>
+
+<!-- ===== PAGE: PENGATURAN MENU ===== -->
+<div class="page" id="page-menu-settings">
+  <div class="header">
+    <button class="header-back" onclick="showPage('page-order')">←</button>
+    <div class="header-title">Pengaturan Menu</div>
+  </div>
+  <div class="scroll-content">
+    <div class="section-title">Tambah Menu Baru</div>
+    <div class="card">
+      <div class="form-group">
+        <label class="form-label">Nama Menu</label>
+        <input type="text" class="form-input" id="new-menu-name" placeholder="Misal: Seblak">
+      </div>
+      <button class="btn btn-primary" onclick="addMenu()">+ Tambah Menu</button>
+    </div>
+
+    <div class="section-title">Daftar Menu & Topping</div>
+    <div id="menu-list-settings"></div>
+
+    <div class="section-title" style="margin-top:24px;">Backup Data</div>
+    <div class="card">
+      <div style="display:flex;gap:8px;">
+        <button class="btn btn-green btn-sm" style="flex:1;padding:12px;" onclick="exportData()">📤 Export Data</button>
+        <button class="btn btn-edit btn-sm" style="flex:1;padding:12px;" onclick="document.getElementById('import-file').click()">📥 Import Data</button>
+      </div>
+      <input type="file" id="import-file" accept=".json" style="display:none" onchange="importData(event)">
+    </div>
+  </div>
+</div>
+
+<!-- Bottom Nav -->
+<nav class="bottom-nav" id="bottom-nav">
+  <button class="nav-btn active" onclick="showPage('page-order')" data-page="page-order">
+    <span class="nav-icon">🛒</span>
+    <span class="nav-label">Order</span>
+  </button>
+  <button class="nav-btn" onclick="showPage('page-harian')" data-page="page-harian">
+    <span class="nav-icon">📅</span>
+    <span class="nav-label">Harian</span>
+  </button>
+  <button class="nav-btn" onclick="showPage('page-bulanan')" data-page="page-bulanan">
+    <span class="nav-icon">📆</span>
+    <span class="nav-label">Bulanan</span>
+  </button>
+  <button class="nav-btn" onclick="showPage('page-modal')" data-page="page-modal">
+    <span class="nav-icon">💰</span>
+    <span class="nav-label">Modal</span>
+  </button>
+</nav>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<!-- Modal Edit Menu -->
+<div class="modal-overlay" id="modal-edit-menu">
+  <div class="modal">
+    <div class="modal-title">Edit Nama Menu</div>
+    <div class="form-group">
+      <label class="form-label">Nama Menu</label>
+      <input type="text" class="form-input" id="edit-menu-name">
+    </div>
+    <input type="hidden" id="edit-menu-id">
+    <button class="btn btn-primary" onclick="saveEditMenu()">Simpan</button>
+    <button class="btn btn-outline" style="margin-top:8px;" onclick="closeModal('modal-edit-menu')">Batal</button>
+  </div>
+</div>
+
+<!-- Modal Edit Topping -->
+<div class="modal-overlay" id="modal-edit-topping">
+  <div class="modal">
+    <div class="modal-title">Edit Topping</div>
+    <div class="form-group">
+      <label class="form-label">Nama Topping</label>
+      <input type="text" class="form-input" id="edit-topping-name">
+    </div>
+    <div class="input-row">
+      <div class="form-group">
+        <label class="form-label">Harga Jual (Rp)</label>
+        <input type="number" class="form-input" id="edit-topping-price">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Modal (Rp)</label>
+        <input type="number" class="form-input" id="edit-topping-asli">
+      </div>
+    </div>
+    <input type="hidden" id="edit-topping-id">
+    <input type="hidden" id="edit-topping-menu-id">
+    <button class="btn btn-primary" onclick="saveEditTopping()">Simpan</button>
+    <button class="btn btn-outline" style="margin-top:8px;" onclick="closeModal('modal-edit-topping')">Batal</button>
+  </div>
+</div>
+
+<!-- Modal Tambah Topping -->
+<div class="modal-overlay" id="modal-add-topping">
+  <div class="modal">
+    <div class="modal-title">Tambah Topping</div>
+    <div class="form-group">
+      <label class="form-label">Nama Topping</label>
+      <input type="text" class="form-input" id="add-topping-name" placeholder="Misal: Baso">
+    </div>
+    <div class="input-row">
+      <div class="form-group">
+        <label class="form-label">Harga Jual (Rp)</label>
+        <input type="number" class="form-input" id="add-topping-price" placeholder="0">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Modal (Rp)</label>
+        <input type="number" class="form-input" id="add-topping-asli" placeholder="0">
+      </div>
+    </div>
+    <input type="hidden" id="add-topping-menu-id">
+    <button class="btn btn-primary" onclick="saveAddTopping()">Tambah</button>
+    <button class="btn btn-outline" style="margin-top:8px;" onclick="closeModal('modal-add-topping')">Batal</button>
+  </div>
+</div>
+
+<!-- Modal Edit Order -->
+<div class="modal-overlay" id="modal-edit-order">
+  <div class="modal">
+    <div class="modal-title">Edit Order</div>
+    <div class="form-group">
+      <label class="form-label">Status Pembayaran</label>
+      <select class="form-select" id="edit-order-status">
+        <option value="bayar">✅ Bayar</option>
+        <option value="gratis">🎁 Gratis</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Catatan</label>
+      <input type="text" class="form-input" id="edit-order-note">
+    </div>
+    <input type="hidden" id="edit-order-id">
+    <button class="btn btn-primary" onclick="saveEditOrder()">Simpan</button>
+    <button class="btn btn-outline" style="margin-top:8px;" onclick="closeModal('modal-edit-order')">Batal</button>
+  </div>
+</div>
+
+<!-- Modal Edit Modal/Pengeluaran -->
+<div class="modal-overlay" id="modal-edit-modal">
+  <div class="modal">
+    <div class="modal-title">Edit Pengeluaran</div>
+    <div class="form-group">
+      <label class="form-label">Tanggal</label>
+      <input type="date" class="form-input" id="edit-modal-date">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Keterangan</label>
+      <input type="text" class="form-input" id="edit-modal-desc">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Jumlah (Rp)</label>
+      <input type="number" class="form-input" id="edit-modal-amount">
+    </div>
+    <input type="hidden" id="edit-modal-id">
+    <button class="btn btn-primary" onclick="saveEditModal()">Simpan</button>
+    <button class="btn btn-outline" style="margin-top:8px;" onclick="closeModal('modal-edit-modal')">Batal</button>
+  </div>
+</div>
+
+<!-- Modal Edit Stok Semua -->
+<div class="modal-overlay" id="modal-edit-stok-semua">
+  <div class="modal-box">
+    <div class="modal-title">✏️ Edit Stok Topping</div>
+    <div style="font-size:12px;color:var(--gray);margin-bottom:12px;">Isi jumlah yang ingin ditambahkan. Kosongkan jika tidak ada perubahan.</div>
+    <div id="edit-stok-semua-form"></div>
+    <button class="btn btn-primary" onclick="submitEditStokSemua()">Simpan Stok</button>
+    <button class="btn btn-outline" style="margin-top:8px;" onclick="closeModal('modal-edit-stok-semua')">Batal</button>
+  </div>
+</div>
+
+<!-- Reminder Overlay -->
+<div class="reminder-overlay" id="reminder-overlay">
+  <div class="reminder-box">
+    <div class="reminder-icon">💾</div>
+    <div class="reminder-title">Backup Data Harian</div>
+    <div class="reminder-text">Jangan lupa backup data hari ini! Export data sekarang agar data tetap aman walau cache dihapus.</div>
+    <button class="btn btn-accent" style="margin-bottom:10px;" onclick="exportData(); closeReminder()">📤 Export Sekarang</button>
+    <button class="btn btn-outline" onclick="closeReminder()">Nanti</button>
+  </div>
+</div>
+
+<script>
+// ===== STATE =====
+const MONTHS = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+let state = {
+  menus: [],
+  toppings: [],
+  orders: [],
+  modals: [],
+  stocks: {}, // { toppingId: { stokAwal: N, riwayat: [{date, jumlah, catatan}] } }
+};
+let currentPayStatus = 'bayar';
+let selectedMenus = {}; // { menuId: { qty, toppings: [toppingId] } }
+
+// ===== LOCALSTORAGE =====
+function saveState() {
+  localStorage.setItem('catatan_jualan', JSON.stringify(state));
+}
+function loadState() {
+  const raw = localStorage.getItem('catatan_jualan');
+  if (raw) {
+    try { state = JSON.parse(raw); } catch(e) {}
+  }
+  // Default menus if empty
+  if (!state.menus || state.menus.length === 0) {
+    state.menus = [
+      { id: uid(), name: 'Seblak Original', toppings: [
+        { id: uid(), name: 'Baso', price: 3000 },
+        { id: uid(), name: 'Kerupuk', price: 2000 },
+        { id: uid(), name: 'Telur', price: 3000 },
+      ]},
+      { id: uid(), name: 'Seblak Pedas', toppings: [
+        { id: uid(), name: 'Baso', price: 3000 },
+        { id: uid(), name: 'Sosis', price: 4000 },
+        { id: uid(), name: 'Jamur', price: 1000 },
+      ]},
+    ];
+  }  // Migrate old structure: add toppings array if missing
+  state.menus = state.menus.map(m => ({ id: m.id, name: m.name, toppings: m.toppings || [] }));
+  if (!state.toppings) state.toppings = [];
+  if (!state.orders) state.orders = [];
+  if (!state.modals) state.modals = [];
+  if (!state.stocks) state.stocks = {};
+  saveState();
+}
+
+function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2); }
+
+// ===== FORMAT =====
+function rp(num) { return 'Rp ' + Number(num||0).toLocaleString('id-ID'); }
+function fmtDate(str) {
+  if (!str) return '';
+  const d = new Date(str);
+  return d.toLocaleDateString('id-ID', { weekday:'long', day:'numeric', month:'long', year:'numeric' });
+}
+function fmtDateShort(str) {
+  if (!str) return '';
+  const d = new Date(str);
+  return d.toLocaleDateString('id-ID', { day:'numeric', month:'short' });
+}
+function todayStr() { return new Date().toISOString().slice(0,10); }
+
+// ===== NAVIGATION =====
+function showPage(pageId) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById(pageId).classList.add('active');
+  // Nav
+  document.querySelectorAll('.nav-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.page === pageId);
+  });
+  // Render
+  if (pageId === 'page-harian') renderHarian();
+  if (pageId === 'page-bulanan') renderBulanan();
+  if (pageId === 'page-modal') renderModal();
+  if (pageId === 'page-menu-settings') renderMenuSettings();
+  if (pageId === 'page-order') renderOrderMenuList();
+  // Hide nav for settings
+  document.getElementById('bottom-nav').style.display = pageId === 'page-menu-settings' ? 'none' : 'flex';
+}
+
+// ===== TOAST =====
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 2500);
+}
+
+// ===== MODAL =====
+function openModal(id) { document.getElementById(id).classList.add('show'); }
+function closeModal(id) { document.getElementById(id).classList.remove('show'); }
+
+// ===== ORDER PAGE =====
+function renderOrderMenuList() {
+  const el = document.getElementById('order-menu-list');
+  if (state.menus.length === 0) {
+    el.innerHTML = '<div class="empty"><div class="empty-icon">🍽️</div>Belum ada menu. Tambah menu dulu di ⚙️ Menu.</div>';
+    return;
+  }
+  el.innerHTML = state.menus.map(m => {
+    const sel = selectedMenus[m.id];
+    const isSelected = !!sel;
+    const qty = sel ? sel.qty : 1;
+    const toppings = sel ? sel.toppings : {}; // { toppingId: qty }
+    const toppingTotal = isSelected ? m.toppings.reduce((s, t) => s + (toppings[t.id] || 0) * t.price, 0) : 0;
+    const hasToppingSelected = isSelected && Object.keys(toppings).length > 0;
+    return `
+    <div>
+      <div class="menu-item ${isSelected ? 'selected' : ''}" onclick="toggleMenu('${m.id}')">
+        <div class="check-circle">${isSelected ? '✓' : ''}</div>
+        <div style="flex:1">
+          <div class="menu-name">${m.name}</div>
+          ${isSelected ? (hasToppingSelected ? `<div class="menu-price">${rp(toppingTotal)}</div>` : `<div class="menu-price" style="color:var(--gray);">Rp 0 — pilih topping</div>`) : ''}
+        </div>
+        ${isSelected ? `<div class="qty-control" onclick="event.stopPropagation()">
+          <button class="qty-btn" onclick="changeQty('${m.id}',-1)">−</button>
+          <span class="qty-val">${qty}</span>
+          <button class="qty-btn" onclick="changeQty('${m.id}',1)">+</button>
+        </div>` : ''}
+      </div>
+      ${isSelected && m.toppings && m.toppings.length > 0 ? `
+      <div class="card" style="margin-top:-6px;border-radius:0 0 10px 10px;padding:10px 14px;">
+        <div style="font-size:11px;color:var(--gray);margin-bottom:6px;font-weight:600;">TOPPING</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;">
+        ${m.toppings.map(t => {
+          const tQty = toppings[t.id] || 0;
+          const isTopSelected = tQty > 0;
+          return `
+          <div class="topping-item ${isTopSelected ? 'selected' : ''}" onclick="toggleTopping('${m.id}','${t.id}')" style="flex-direction:column;align-items:flex-start;padding:8px 10px;gap:4px;">
+            <div style="display:flex;align-items:center;gap:6px;width:100%;">
+              <div class="topping-check">${isTopSelected ? '✓' : ''}</div>
+              <span style="flex:1;font-size:12px;font-weight:500;">${t.name}</span>
+            </div>
+            <div style="display:flex;align-items:center;justify-content:space-between;width:100%;">
+              <span style="font-size:11px;color:var(--gray);">+${t.price.toLocaleString('id-ID')}</span>
+              ${isTopSelected ? `<div class="qty-control" onclick="event.stopPropagation()" style="gap:2px;">
+                <button class="qty-btn" style="width:22px;height:22px;font-size:13px;" onclick="changeToppingQty('${m.id}','${t.id}',-1)">−</button>
+                <span class="qty-val" style="font-size:12px;min-width:16px;">${tQty}</span>
+                <button class="qty-btn" style="width:22px;height:22px;font-size:13px;" onclick="changeToppingQty('${m.id}','${t.id}',1)">+</button>
+              </div>` : ''}
+            </div>
+          </div>`;
+        }).join('')}
+        </div>
+      </div>` : ''}
+    </div>`;
+  }).join('');
+}
+
+function toggleMenu(id) {
+  if (selectedMenus[id]) {
+    delete selectedMenus[id];
+  } else {
+    selectedMenus[id] = { qty: 1, toppings: {} };
+  }
+  renderOrderMenuList();
+}
+
+function changeQty(id, delta) {
+  if (!selectedMenus[id]) return;
+  selectedMenus[id].qty = Math.max(1, selectedMenus[id].qty + delta);
+  renderOrderMenuList();
+}
+
+function toggleTopping(menuId, toppingId) {
+  if (!selectedMenus[menuId]) return;
+  const tops = selectedMenus[menuId].toppings;
+  if (tops[toppingId]) {
+    delete tops[toppingId];
+  } else {
+    tops[toppingId] = 1;
+  }
+  renderOrderMenuList();
+}
+
+function changeToppingQty(menuId, toppingId, delta) {
+  if (!selectedMenus[menuId]) return;
+  const tops = selectedMenus[menuId].toppings;
+  const current = tops[toppingId] || 0;
+  const next = current + delta;
+  if (next <= 0) {
+    delete tops[toppingId];
+  } else {
+    tops[toppingId] = next;
+  }
+  renderOrderMenuList();
+}
+
+function setPayStatus(status) {
+  currentPayStatus = status;
+  document.getElementById('btn-bayar').style.background = status === 'bayar' ? 'var(--dark)' : '#f0f0f0';
+  document.getElementById('btn-bayar').style.color = status === 'bayar' ? '#fff' : 'var(--gray)';
+  document.getElementById('btn-gratis').style.background = status === 'gratis' ? 'var(--accent)' : '#f0f0f0';
+  document.getElementById('btn-gratis').style.color = status === 'gratis' ? '#fff' : 'var(--gray)';
+}
+
+function submitOrder() {
+  const keys = Object.keys(selectedMenus);
+  if (keys.length === 0) { toast('Pilih menu dulu!'); return; }
+  const note = document.getElementById('order-note').value;
+  const items = keys.map(menuId => {
+    const m = state.menus.find(x => x.id === menuId);
+    const sel = selectedMenus[menuId];
+    const toppingEntries = Object.entries(sel.toppings);
+    const tops = toppingEntries.map(([tid, tQty]) => {
+      const t = m.toppings.find(x => x.id === tid);
+      return t ? { id: t.id, name: t.name, price: t.price, asli: t.asli||0, qty: tQty } : null;
+    }).filter(Boolean);
+    const toppingPrice = tops.reduce((s, t) => s + t.price * t.qty, 0);
+    const toppingAsli = tops.reduce((s, t) => s + t.asli * t.qty, 0);
+    return {
+      menuId, menuName: m.name,
+      qty: sel.qty,
+      toppings: tops,
+      toppingPrice,
+      toppingAsli,
+      totalPrice: toppingPrice * sel.qty,
+      totalAsli: toppingAsli * sel.qty,
+    };
+  });
+  const order = {
+    id: uid(),
+    date: todayStr(),
+    time: new Date().toLocaleTimeString('id-ID', { hour:'2-digit', minute:'2-digit' }),
+    items,
+    status: currentPayStatus,
+    note,
+    grandTotal: items.reduce((s, i) => s + i.totalPrice, 0),
+    grandAsli: items.reduce((s, i) => s + i.totalAsli, 0),
+  };
+  state.orders.push(order);
+  saveState();
+  selectedMenus = {};
+  document.getElementById('order-note').value = '';
+  setPayStatus('bayar');
+  renderOrderMenuList();
+  toast('✅ Order berhasil disimpan!');
+}
+
+// ===== REKAP HARIAN =====
+function renderHarian() {
+  const dateEl = document.getElementById('filter-date');
+  if (!dateEl.value) dateEl.value = todayStr();
+  const date = dateEl.value;
+  const orders = state.orders.filter(o => o.date === date);
+
+  // Stats
+  const totalBayar = orders.filter(o => o.status === 'bayar').reduce((s, o) => s + o.grandTotal, 0);
+  const totalGratis = orders.filter(o => o.status === 'gratis').reduce((s, o) => s + o.grandTotal, 0);
+  const totalPenjualan = totalBayar + totalGratis;
+  const hargaAsliTerjual = orders.reduce((s, o) => s + (o.grandAsli||0), 0);
+  const modalManual = state.modals.filter(m => m.date === date).reduce((s, m) => s + m.amount, 0);
+  const totalDikurang = hargaAsliTerjual + modalManual;
+  const bersih = totalBayar - totalDikurang;
+
+  document.getElementById('harian-stats').innerHTML = `
+    <div class="stat-grid">
+      <div class="stat-card full"><div class="stat-label">Total Penjualan <span style="font-size:10px;color:var(--gray);font-weight:400;">(termasuk gratis ${rp(totalGratis)})</span></div><div class="stat-value" style="color:var(--green)">${rp(totalPenjualan)}</div></div>
+      <div class="stat-card"><div class="stat-label">Modal Terjual</div><div class="stat-value" style="color:var(--red)">${rp(hargaAsliTerjual)}</div></div>
+      <div class="stat-card"><div class="stat-label">Pengeluaran Manual</div><div class="stat-value" style="color:var(--red)">${rp(modalManual)}</div></div>
+      <div class="stat-card"><div class="stat-label">Total Gratis</div><div class="stat-value" style="color:var(--yellow)">${rp(totalGratis)}</div></div>
+      <div class="stat-card"><div class="stat-label">Total Bayar</div><div class="stat-value" style="color:var(--green)">${rp(totalBayar)}</div></div>
+      <div class="stat-card full"><div class="stat-label">Penghasilan Bersih</div><div class="stat-value" style="color:${bersih>=0?'#6ddc6d':'#ff7c7c'};font-size:22px;">${rp(bersih)}</div></div>
+    </div>`;
+
+  // Render list pengeluaran manual hari ini
+  const pengeluaranHarian = state.modals.filter(m => m.date === date);
+  if (pengeluaranHarian.length === 0) {
+    document.getElementById('harian-pengeluaran-list').innerHTML = '';
+  } else {
+    document.getElementById('harian-pengeluaran-list').innerHTML = pengeluaranHarian.map(m => `
+      <div class="card" style="margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;">
+        <div>
+          <div style="font-size:13px;font-weight:600;">${m.desc}</div>
+          <div style="font-size:11px;color:var(--gray);">Pengeluaran manual</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span style="font-size:14px;font-weight:800;color:var(--red);">${rp(m.amount)}</span>
+          <button class="btn btn-sm btn-delete" onclick="deleteHarianPengeluaran('${m.id}')">Hapus</button>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  if (orders.length === 0) {
+    document.getElementById('harian-list').innerHTML = '<div class="empty"><div class="empty-icon">📋</div>Belum ada order hari ini.</div>';
+    return;
+  }
+
+  const renderOrderCard = o => `
+    <div class="card" style="margin-bottom:10px;">
+      <div class="card-row" style="margin-bottom:8px;">
+        <div>
+          <span style="font-size:13px;font-weight:700;">${o.time}</span>
+          <span class="badge ${o.status === 'bayar' ? 'badge-green' : 'badge-yellow'}" style="margin-left:8px;">${o.status === 'bayar' ? '✅ Bayar' : '🎁 Gratis'}</span>
+        </div>
+        <div style="display:flex;gap:6px;">
+          <button class="btn btn-sm btn-edit" onclick="editOrder('${o.id}')">Edit</button>
+          <button class="btn btn-sm btn-delete" onclick="deleteOrder('${o.id}')">Hapus</button>
+        </div>
+      </div>
+      ${o.items.map(item => `
+        <div class="order-detail-item">
+          <div>
+            <div style="font-size:13px;font-weight:600;">${item.menuName} ×${item.qty}</div>
+            ${item.toppings.length > 0 ? `<div style="font-size:11px;color:var(--gray);">+ ${item.toppings.map(t => t.qty > 1 ? `${t.name} ×${t.qty}` : t.name).join(', ')}</div>` : ''}
+          </div>
+          <div style="font-size:13px;font-weight:600;">${rp(item.totalPrice)}</div>
+        </div>
+      `).join('')}
+      ${o.note ? `<div style="font-size:12px;color:var(--gray);margin-top:8px;">📝 ${o.note}</div>` : ''}
+      <div class="divider"></div>
+      <div class="card-row">
+        <span style="font-size:13px;font-weight:700;">Total</span>
+        <span style="font-size:15px;font-weight:800;color:${o.status==='bayar'?'var(--green)':'var(--yellow)'};">${rp(o.grandTotal)}</span>
+      </div>
+    </div>`;
+
+  const orderBayar = [...orders].reverse().filter(o => o.status === 'bayar');
+  const orderGratis = [...orders].reverse().filter(o => o.status === 'gratis');
+
+  document.getElementById('harian-list').innerHTML = `
+    ${orderBayar.length > 0 ? `
+      <div style="font-size:11px;font-weight:700;color:var(--green);margin-bottom:6px;letter-spacing:0.5px;">✅ BAYAR (${orderBayar.length} order)</div>
+      ${orderBayar.map(renderOrderCard).join('')}
+    ` : ''}
+    ${orderGratis.length > 0 ? `
+      <div style="font-size:11px;font-weight:700;color:var(--yellow);margin-top:4px;margin-bottom:6px;letter-spacing:0.5px;">🎁 GRATIS (${orderGratis.length} order)</div>
+      ${orderGratis.map(renderOrderCard).join('')}
+    ` : ''}
+  `;
+}
+
+function submitHarianPengeluaran() {
+  const date = document.getElementById('filter-date').value || todayStr();
+  const desc = document.getElementById('harian-pengeluaran-desc').value.trim();
+  const amount = parseFloat(document.getElementById('harian-pengeluaran-amount').value);
+  if (!desc) { toast('Isi keterangan dulu!'); return; }
+  if (!amount || amount <= 0) { toast('Isi jumlah yang valid!'); return; }
+  state.modals.push({ id: uid(), date, desc, amount });
+  saveState();
+  document.getElementById('harian-pengeluaran-desc').value = '';
+  document.getElementById('harian-pengeluaran-amount').value = '';
+  renderHarian();
+  toast('✅ Pengeluaran dicatat!');
+}
+
+function deleteHarianPengeluaran(id) {
+  if (!confirm('Hapus pengeluaran ini?')) return;
+  state.modals = state.modals.filter(x => x.id !== id);
+  saveState();
+  renderHarian();
+  toast('Pengeluaran dihapus.');
+}
+
+function editOrder(id) {
+  const o = state.orders.find(x => x.id === id);
+  if (!o) return;
+  document.getElementById('edit-order-id').value = id;
+  document.getElementById('edit-order-status').value = o.status;
+  document.getElementById('edit-order-note').value = o.note || '';
+  openModal('modal-edit-order');
+}
+function saveEditOrder() {
+  const id = document.getElementById('edit-order-id').value;
+  const idx = state.orders.findIndex(x => x.id === id);
+  if (idx < 0) return;
+  state.orders[idx].status = document.getElementById('edit-order-status').value;
+  state.orders[idx].note = document.getElementById('edit-order-note').value;
+  saveState();
+  closeModal('modal-edit-order');
+  renderHarian();
+  toast('Order diperbarui!');
+}
+function deleteOrder(id) {
+  if (!confirm('Hapus order ini?')) return;
+  state.orders = state.orders.filter(x => x.id !== id);
+  saveState();
+  renderHarian();
+  toast('Order dihapus.');
+}
+
+// ===== REKAP BULANAN =====
+function initMonthYearFilter(monthId, yearId, renderFn) {
+  const mEl = document.getElementById(monthId);
+  const yEl = document.getElementById(yearId);
+  const now = new Date();
+  mEl.innerHTML = MONTHS.map((m,i) => `<option value="${i}" ${i===now.getMonth()?'selected':''}>${m}</option>`).join('');
+  const years = [...new Set(state.orders.map(o => new Date(o.date).getFullYear()))];
+  if (!years.includes(now.getFullYear())) years.push(now.getFullYear());
+  years.sort((a,b) => b-a);
+  yEl.innerHTML = years.map(y => `<option value="${y}" ${y===now.getFullYear()?'selected':''}>${y}</option>`).join('');
+}
+
+function renderBulanan() {
+  const month = +document.getElementById('filter-month').value;
+  const year = +document.getElementById('filter-year').value;
+  const selectedDay = document.getElementById('filter-day').value;
+
+  // Isi opsi tanggal berdasarkan bulan/tahun yang dipilih
+  const allOrders = state.orders.filter(o => {
+    const d = new Date(o.date);
+    return d.getMonth() === month && d.getFullYear() === year;
+  });
+  const availableDates = [...new Set(allOrders.map(o => o.date))].sort();
+  const dayEl = document.getElementById('filter-day');
+  const currentDay = dayEl.value;
+  dayEl.innerHTML = `<option value="">— Semua Tanggal —</option>` +
+    availableDates.map(d => `<option value="${d}" ${d===currentDay?'selected':''}>${fmtDate(d)}</option>`).join('');
+
+  const orders = selectedDay ? allOrders.filter(o => o.date === selectedDay) : allOrders;
+
+  const totalPenjualan = orders.filter(o => o.status==='bayar').reduce((s,o) => s+o.grandTotal, 0);
+  const totalGratis = orders.filter(o => o.status==='gratis').reduce((s,o) => s+o.grandTotal, 0);
+  const hargaAsliTerjual = orders.filter(o => o.status==='bayar').reduce((s,o) => s+(o.grandAsli||0), 0);
+  const totalModalBelanja = state.modals.filter(m => {
+    const d = new Date(m.date);
+    return d.getMonth()===month && d.getFullYear()===year;
+  }).reduce((s,m) => s+m.amount, 0);
+  const totalDikurang = hargaAsliTerjual + totalModalBelanja;
+  const laba = totalPenjualan - totalDikurang;
+
+  document.getElementById('bulanan-stats').innerHTML = `
+    <div class="stat-grid">
+      <div class="stat-card"><div class="stat-label">Total Penjualan</div><div class="stat-value" style="color:var(--green)">${rp(totalPenjualan)}</div></div>
+      <div class="stat-card"><div class="stat-label">Total Gratis</div><div class="stat-value" style="color:var(--yellow)">${rp(totalGratis)}</div></div>
+      <div class="stat-card"><div class="stat-label">Modal Terjual</div><div class="stat-value" style="color:var(--red)">${rp(hargaAsliTerjual)}</div></div>
+      <div class="stat-card"><div class="stat-label">Pengeluaran Manual</div><div class="stat-value" style="color:var(--red)">${rp(totalModalBelanja)}</div></div>
+      <div class="stat-card full"><div class="stat-label">Penghasilan Bersih</div><div class="stat-value" style="color:${laba>=0?'#6ddc6d':'#ff7c7c'};font-size:22px;">${rp(laba)}</div></div>
+    </div>`;
+
+  // Group by date
+  const groups = {};
+  orders.forEach(o => {
+    if (!groups[o.date]) groups[o.date] = [];
+    groups[o.date].push(o);
+  });
+  const sorted = Object.entries(groups).sort((a,b) => b[0].localeCompare(a[0]));
+
+  if (sorted.length === 0) {
+    document.getElementById('bulanan-list').innerHTML = '<div class="empty"><div class="empty-icon">📆</div>Belum ada data bulan ini.</div>';
+    return;
+  }
+
+  document.getElementById('bulanan-list').innerHTML = sorted.map(([date, dayOrders]) => {
+    const dayTotal = dayOrders.filter(o=>o.status==='bayar').reduce((s,o)=>s+o.grandTotal,0);
+    const dayGratis = dayOrders.filter(o=>o.status==='gratis').reduce((s,o)=>s+o.grandTotal,0);
+    const id = 'day-' + date.replace(/-/g,'');
+
+    const renderOrderItem = o => `
+      <div class="order-item">
+        <div class="card-row" style="margin-bottom:6px;">
+          <span style="font-size:13px;font-weight:600;">${o.time} <span class="badge ${o.status==='bayar'?'badge-green':'badge-yellow'}">${o.status==='bayar'?'✅ Bayar':'🎁 Gratis'}</span></span>
+          <div style="display:flex;gap:4px;">
+            <button class="btn btn-sm btn-edit" onclick="editOrder('${o.id}');showPage('page-harian');document.getElementById('filter-date').value='${date}';renderHarian()">Edit</button>
+            <button class="btn btn-sm btn-delete" onclick="deleteOrderFromBulanan('${o.id}','${date}')">Hapus</button>
+          </div>
+        </div>
+        ${o.items.map(item=>`
+          <div style="display:flex;justify-content:space-between;font-size:12px;padding:2px 0;color:var(--gray);">
+            <span>${item.menuName} ×${item.qty}${item.toppings.length>0?' (+'+item.toppings.map(t=>t.qty>1?`${t.name} ×${t.qty}`:t.name).join(', ')+')':''}</span>
+            <span>${rp(item.totalPrice)}</span>
+          </div>
+        `).join('')}
+        ${o.note?`<div style="font-size:11px;color:var(--gray);margin-top:4px;">📝 ${o.note}</div>`:''}
+        <div style="text-align:right;font-size:13px;font-weight:700;margin-top:6px;">${rp(o.grandTotal)}</div>
+      </div>`;
+
+    const bayarOrders = dayOrders.filter(o => o.status === 'bayar');
+    const gratisOrders = dayOrders.filter(o => o.status === 'gratis');
+
+    return `
+    <div class="day-group">
+      <div class="day-header" onclick="toggleDay('${id}')">
+        <div>
+          <div style="font-weight:700;font-size:14px;">${fmtDate(date)}</div>
+          <div style="font-size:11px;color:var(--gray);margin-top:2px;">${dayOrders.length} order · Gratis ${rp(dayGratis)}</div>
+        </div>
+        <div style="text-align:right;">
+          <div style="font-weight:800;color:var(--green);font-size:15px;">${rp(dayTotal)}</div>
+          <div style="font-size:11px;color:var(--gray);">▼</div>
+        </div>
+      </div>
+      <div class="day-content" id="${id}">
+        ${bayarOrders.length > 0 ? `
+          <div style="font-size:11px;font-weight:700;color:var(--green);margin-bottom:4px;letter-spacing:0.5px;">✅ BAYAR (${bayarOrders.length} order)</div>
+          ${bayarOrders.map(renderOrderItem).join('')}
+        ` : ''}
+        ${gratisOrders.length > 0 ? `
+          <div style="font-size:11px;font-weight:700;color:var(--yellow);margin-top:6px;margin-bottom:4px;letter-spacing:0.5px;">🎁 GRATIS (${gratisOrders.length} order)</div>
+          ${gratisOrders.map(renderOrderItem).join('')}
+        ` : ''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function toggleDay(id) {
+  const el = document.getElementById(id);
+  const header = el.previousElementSibling;
+  el.classList.toggle('open');
+  header.classList.toggle('open');
+}
+
+function deleteOrderFromBulanan(orderId, date) {
+  if (!confirm('Hapus order ini?')) return;
+  state.orders = state.orders.filter(x => x.id !== orderId);
+  saveState();
+  renderBulanan();
+  toast('Order dihapus.');
+}
+
+// ===== STOK TOPPING =====
+function getAllToppings() {
+  const map = {};
+  state.menus.forEach(m => {
+    m.toppings.forEach(t => {
+      if (!map[t.id]) map[t.id] = { id: t.id, name: t.name };
+    });
+  });
+  return Object.values(map);
+}
+
+function getTerjual(toppingId) {
+  let total = 0;
+  state.orders.forEach(o => {
+    o.items.forEach(item => {
+      item.toppings.forEach(t => {
+        if (t.id === toppingId) total += t.qty;
+      });
+    });
+  });
+  return total;
+}
+
+function renderStok(editMode = false) {
+  const toppings = getAllToppings();
+  if (toppings.length === 0) {
+    document.getElementById('stok-list').innerHTML = '<div class="empty"><div class="empty-icon">📦</div>Belum ada topping.</div>';
+    return;
+  }
+  document.getElementById('stok-list').innerHTML = `
+    <div style="text-align:right;margin-bottom:8px;">
+      ${editMode
+        ? `<button class="btn btn-primary" onclick="simpanEditStok()">💾 Simpan</button>
+           <button class="btn btn-outline" style="margin-left:6px;" onclick="renderStok(false)">Batal</button>`
+        : `<button class="btn btn-primary" onclick="renderStok(true)">✏️ Edit Stok</button>`
+      }
+    </div>
+    ${toppings.map(t => {
+      const stokData = state.stocks[t.id] || { total: 0, riwayat: [] };
+      const terjual = getTerjual(t.id);
+      const sisa = stokData.total - terjual;
+      const sisaColor = sisa <= 0 ? '#ff7c7c' : sisa <= 5 ? 'var(--yellow)' : 'var(--green)';
+      return `
+      <div class="card" style="margin-bottom:8px;">
+        <div style="font-size:14px;font-weight:700;margin-bottom:8px;">${t.name}</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;text-align:center;">
+          <div style="background:#f5f5f5;border-radius:8px;padding:8px;">
+            <div style="font-size:10px;color:var(--gray);margin-bottom:4px;">STOK</div>
+            ${editMode
+              ? `<input type="number" id="stok-input-${t.id}" value="${stokData.total}" min="0"
+                   style="width:100%;border:2px solid var(--primary);border-radius:6px;padding:4px;font-size:16px;font-weight:800;text-align:center;background:#fff;">`
+              : `<div style="font-size:16px;font-weight:800;">${stokData.total}</div>`
+            }
+          </div>
+          <div style="background:#f5f5f5;border-radius:8px;padding:8px;">
+            <div style="font-size:10px;color:var(--gray);margin-bottom:2px;">TERJUAL</div>
+            <div style="font-size:16px;font-weight:800;color:var(--red);">${terjual}</div>
+          </div>
+          <div style="background:#f5f5f5;border-radius:8px;padding:8px;">
+            <div style="font-size:10px;color:var(--gray);margin-bottom:2px;">SISA</div>
+            <div style="font-size:16px;font-weight:800;color:${sisaColor};">${sisa}</div>
+          </div>
+        </div>
+      </div>`;
+    }).join('')}
+  `;
+}
+
+function simpanEditStok() {
+  const toppings = getAllToppings();
+  toppings.forEach(t => {
+    const val = parseInt(document.getElementById(`stok-input-${t.id}`).value) || 0;
+    if (!state.stocks[t.id]) state.stocks[t.id] = { total: 0, riwayat: [] };
+    state.stocks[t.id].total = val;
+  });
+  saveState();
+  renderStok(false);
+  toast('✅ Stok berhasil disimpan!');
+}
+
+function openEditStokSemua() {}
+function submitEditStokSemua() {}
+
+function submitEditStokSemua() {
+  const toppings = getAllToppings();
+  let ada = false;
+  toppings.forEach(t => {
+    const val = parseInt(document.getElementById(`stok-input-${t.id}`).value);
+    if (val > 0) {
+      if (!state.stocks[t.id]) state.stocks[t.id] = { total: 0, riwayat: [] };
+      state.stocks[t.id].total += val;
+      state.stocks[t.id].riwayat.push({ date: todayStr(), jumlah: val, catatan: '' });
+      ada = true;
+    }
+  });
+  if (!ada) { toast('Isi minimal 1 stok topping!'); return; }
+  saveState();
+  closeModal('modal-edit-stok-semua');
+  renderStok();
+  toast('✅ Stok berhasil diperbarui!');
+}
+
+// ===== MODAL/PENGELUARAN =====
+function renderModal() {
+  renderStok();
+  const month = +document.getElementById('modal-filter-month').value;
+  const year = +document.getElementById('modal-filter-year').value;
+  const modals = state.modals.filter(m => {
+    const d = new Date(m.date);
+    return d.getMonth()===month && d.getFullYear()===year;
+  });
+  const orders = state.orders.filter(o => {
+    const d = new Date(o.date);
+    return d.getMonth()===month && d.getFullYear()===year && o.status==='bayar';
+  });
+  const totalModalManual = modals.reduce((s,m) => s+m.amount, 0);
+  const hargaAsliTerjual = orders.reduce((s,o) => s+(o.grandAsli||0), 0);
+  const totalDikurang = totalModalManual + hargaAsliTerjual;
+  const totalPenjualan = orders.reduce((s,o) => s+o.grandTotal, 0);
+  const laba = totalPenjualan - totalDikurang;
+
+  document.getElementById('modal-summary').innerHTML = `
+    <div class="stat-grid">
+      <div class="stat-card"><div class="stat-label">Total Penjualan</div><div class="stat-value" style="color:var(--green)">${rp(totalPenjualan)}</div></div>
+      <div class="stat-card"><div class="stat-label">Modal Terjual</div><div class="stat-value" style="color:var(--red)">${rp(hargaAsliTerjual)}</div></div>
+      <div class="stat-card"><div class="stat-label">Pengeluaran Manual</div><div class="stat-value" style="color:var(--red)">${rp(totalModalManual)}</div></div>
+      <div class="stat-card"><div class="stat-label">Total Dikurang</div><div class="stat-value" style="color:var(--red)">${rp(totalDikurang)}</div></div>
+      <div class="stat-card full"><div class="stat-label">Penghasilan Bersih</div><div class="stat-value" style="color:${laba>=0?'#6ddc6d':'#ff7c7c'};font-size:22px;">${rp(laba)}</div></div>
+    </div>`;
+
+  if (modals.length === 0) {
+    document.getElementById('modal-list').innerHTML = '<div class="empty"><div class="empty-icon">💸</div>Belum ada pengeluaran bulan ini.</div>';
+    return;
+  }
+
+  document.getElementById('modal-list').innerHTML = [...modals].sort((a,b)=>b.date.localeCompare(a.date)).map(m => `
+    <div class="card" style="margin-bottom:8px;">
+      <div class="card-row">
+        <div>
+          <div style="font-size:13px;font-weight:700;">${m.desc}</div>
+          <div style="font-size:11px;color:var(--gray);margin-top:2px;">${fmtDateShort(m.date)}</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span style="font-size:15px;font-weight:800;color:var(--red);">${rp(m.amount)}</span>
+          <button class="btn btn-sm btn-edit" onclick="editModal('${m.id}')">Edit</button>
+          <button class="btn btn-sm btn-delete" onclick="deleteModal('${m.id}')">Hapus</button>
+        </div>
+      </div>
+    </div>
+  `).join('');
+}
+
+let editingModalId = null;
+function submitModal() {
+  const date = document.getElementById('pengeluaran-date').value;
+  const desc = document.getElementById('pengeluaran-desc').value;
+  const amount = parseFloat(document.getElementById('pengeluaran-amount').value);
+  if (!date || !desc || !amount) { toast('Semua kolom wajib diisi!'); return; }
+  if (editingModalId) {
+    const idx = state.modals.findIndex(x => x.id === editingModalId);
+    if (idx >= 0) state.modals[idx] = { ...state.modals[idx], date, desc, amount };
+    editingModalId = null;
+    document.getElementById('pengeluaran-submit-btn').textContent = 'Simpan Pengeluaran';
+  } else {
+    state.modals.push({ id: uid(), date, desc, amount });
+  }
+  saveState();
+  document.getElementById('pengeluaran-date').value = todayStr();
+  document.getElementById('pengeluaran-desc').value = '';
+  document.getElementById('pengeluaran-amount').value = '';
+  renderModal();
+  toast('✅ Pengeluaran disimpan!');
+}
+
+function editModal(id) {
+  const m = state.modals.find(x => x.id === id);
+  if (!m) return;
+  document.getElementById('edit-modal-id').value = id;
+  document.getElementById('edit-modal-date').value = m.date;
+  document.getElementById('edit-modal-desc').value = m.desc;
+  document.getElementById('edit-modal-amount').value = m.amount;
+  openModal('modal-edit-modal');
+}
+function saveEditModal() {
+  const id = document.getElementById('edit-modal-id').value;
+  const idx = state.modals.findIndex(x => x.id === id);
+  if (idx < 0) return;
+  state.modals[idx] = {
+    ...state.modals[idx],
+    date: document.getElementById('edit-modal-date').value,
+    desc: document.getElementById('edit-modal-desc').value,
+    amount: parseFloat(document.getElementById('edit-modal-amount').value),
+  };
+  saveState();
+  closeModal('modal-edit-modal');
+  renderModal();
+  toast('Pengeluaran diperbarui!');
+}
+function deleteModal(id) {
+  if (!confirm('Hapus pengeluaran ini?')) return;
+  state.modals = state.modals.filter(x => x.id !== id);
+  saveState();
+  renderModal();
+  toast('Dihapus.');
+}
+
+// ===== MENU SETTINGS =====
+function renderMenuSettings() {
+  document.getElementById('menu-list-settings').innerHTML = state.menus.length === 0
+    ? '<div class="empty"><div class="empty-icon">🍽️</div>Belum ada menu.</div>'
+    : state.menus.map(m => `
+      <div class="card" style="margin-bottom:10px;">
+        <div class="card-row" style="margin-bottom:8px;">
+          <div style="font-weight:700;font-size:15px;">🍽️ ${m.name}</div>
+          <div style="display:flex;gap:6px;">
+            <button class="btn btn-sm btn-edit" onclick="editMenu('${m.id}')">Edit</button>
+            <button class="btn btn-sm btn-delete" onclick="deleteMenu('${m.id}')">Hapus</button>
+          </div>
+        </div>
+        <div style="font-size:11px;color:var(--gray);margin-bottom:8px;text-transform:uppercase;letter-spacing:1px;font-weight:600;">Topping (${m.toppings.length})</div>
+        ${m.toppings.length === 0 ? '<div style="font-size:12px;color:var(--gray);margin-bottom:8px;">Belum ada topping</div>' :
+          m.toppings.map(t => `
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);">
+              <div>
+                <span style="font-size:13px;font-weight:600;">${t.name}</span>
+                <span style="font-size:12px;color:var(--gray);margin-left:8px;">Jual: ${rp(t.price)}</span>
+                <span style="font-size:12px;color:var(--red);margin-left:4px;">Modal: ${rp(t.asli||0)}</span>
+              </div>
+              <div style="display:flex;gap:4px;">
+                <button class="btn btn-sm btn-edit" onclick="editTopping('${m.id}','${t.id}')">Edit</button>
+                <button class="btn btn-sm btn-delete" onclick="deleteTopping('${m.id}','${t.id}')">Hapus</button>
+              </div>
+            </div>`).join('')}
+        <button class="btn btn-sm btn-green" style="margin-top:10px;width:100%;padding:8px;" onclick="openAddTopping('${m.id}')">+ Tambah Topping</button>
+      </div>`).join('');
+}
+
+
+function addMenu() {
+  const name = document.getElementById('new-menu-name').value.trim();
+  if (!name) { toast('Isi nama menu!'); return; }
+  state.menus.push({ id: uid(), name, toppings: [] });
+  saveState();
+  document.getElementById('new-menu-name').value = '';
+  renderMenuSettings();
+  toast('✅ Menu ditambahkan!');
+}
+
+function editMenu(id) {
+  const m = state.menus.find(x => x.id === id);
+  if (!m) return;
+  document.getElementById('edit-menu-id').value = id;
+  document.getElementById('edit-menu-name').value = m.name;
+  openModal('modal-edit-menu');
+}
+function saveEditMenu() {
+  const id = document.getElementById('edit-menu-id').value;
+  const idx = state.menus.findIndex(x => x.id === id);
+  if (idx < 0) return;
+  state.menus[idx].name = document.getElementById('edit-menu-name').value;
+  saveState();
+  closeModal('modal-edit-menu');
+  renderMenuSettings();
+  toast('Menu diperbarui!');
+}
+function deleteMenu(id) {
+  if (!confirm('Hapus menu ini beserta semua toppingnya?')) return;
+  state.menus = state.menus.filter(x => x.id !== id);
+  saveState();
+  renderMenuSettings();
+  toast('Menu dihapus.');
+}
+
+function openAddTopping(menuId) {
+  document.getElementById('add-topping-menu-id').value = menuId;
+  document.getElementById('add-topping-name').value = '';
+  document.getElementById('add-topping-price').value = '';
+  openModal('modal-add-topping');
+}
+function saveAddTopping() {
+  const menuId = document.getElementById('add-topping-menu-id').value;
+  const name = document.getElementById('add-topping-name').value.trim();
+  const price = parseFloat(document.getElementById('add-topping-price').value)||0;
+  const modal = parseFloat(document.getElementById('add-topping-asli').value)||0;
+  if (!name) { toast('Isi nama topping!'); return; }
+  const idx = state.menus.findIndex(x => x.id === menuId);
+  if (idx < 0) return;
+  state.menus[idx].toppings.push({ id: uid(), name, price, modal });
+  saveState();
+  closeModal('modal-add-topping');
+  renderMenuSettings();
+  toast('✅ Topping ditambahkan!');
+}
+function editTopping(menuId, toppingId) {
+  const m = state.menus.find(x => x.id === menuId);
+  if (!m) return;
+  const t = m.toppings.find(x => x.id === toppingId);
+  if (!t) return;
+  document.getElementById('edit-topping-menu-id').value = menuId;
+  document.getElementById('edit-topping-id').value = toppingId;
+  document.getElementById('edit-topping-name').value = t.name;
+  document.getElementById('edit-topping-price').value = t.price;
+  document.getElementById('edit-topping-asli').value = t.asli || 0;
+  openModal('modal-edit-topping');
+}
+function saveEditTopping() {
+  const menuId = document.getElementById('edit-topping-menu-id').value;
+  const toppingId = document.getElementById('edit-topping-id').value;
+  const mIdx = state.menus.findIndex(x => x.id === menuId);
+  if (mIdx < 0) return;
+  const tIdx = state.menus[mIdx].toppings.findIndex(x => x.id === toppingId);
+  if (tIdx < 0) return;
+  state.menus[mIdx].toppings[tIdx] = {
+    ...state.menus[mIdx].toppings[tIdx],
+    name: document.getElementById('edit-topping-name').value,
+    price: parseFloat(document.getElementById('edit-topping-price').value)||0,
+    asli: parseFloat(document.getElementById('edit-topping-asli').value)||0,
+  };
+  saveState();
+  closeModal('modal-edit-topping');
+  renderMenuSettings();
+  toast('Topping diperbarui!');
+}
+function deleteTopping(menuId, toppingId) {
+  if (!confirm('Hapus topping ini?')) return;
+  const idx = state.menus.findIndex(x => x.id === menuId);
+  if (idx < 0) return;
+  state.menus[idx].toppings = state.menus[idx].toppings.filter(x => x.id !== toppingId);
+  saveState();
+  renderMenuSettings();
+  toast('Topping dihapus.');
+}
+
+// ===== EXPORT / IMPORT =====
+function exportData() {
+  const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const now = new Date();
+  a.href = url;
+  a.download = `catatan-jualan-${now.toISOString().slice(0,10)}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+  // Save last export date
+  localStorage.setItem('last_export_date', todayStr());
+  toast('✅ Data berhasil diexport!');
+}
+function importData(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const imported = JSON.parse(e.target.result);
+      if (!confirm('Import akan menggabungkan data. Lanjutkan?')) return;
+      // Merge
+      const existingOrderIds = new Set(state.orders.map(o=>o.id));
+      const existingModalIds = new Set(state.modals.map(m=>m.id));
+      if (imported.orders) imported.orders.forEach(o => { if (!existingOrderIds.has(o.id)) state.orders.push(o); });
+      if (imported.modals) imported.modals.forEach(m => { if (!existingModalIds.has(m.id)) state.modals.push(m); });
+      if (imported.menus && imported.menus.length > 0) state.menus = imported.menus;
+      if (imported.toppings && imported.toppings.length > 0) state.toppings = imported.toppings;
+      saveState();
+      toast('✅ Data berhasil diimport!');
+      renderOrderMenuList();
+    } catch(e) { toast('❌ File tidak valid!'); }
+  };
+  reader.readAsText(file);
+  event.target.value = '';
+}
+
+// ===== REMINDER =====
+function checkReminder() {
+  const lastExport = localStorage.getItem('last_export_date');
+  const lastReminder = localStorage.getItem('last_reminder_date');
+  const today = todayStr();
+  // Show reminder once per day, if haven't exported today
+  if (lastReminder === today) return;
+  if (lastExport === today) return;
+  // Only show if there's data
+  if (state.orders.length === 0 && state.modals.length === 0) return;
+  localStorage.setItem('last_reminder_date', today);
+  setTimeout(() => {
+    document.getElementById('reminder-overlay').classList.add('show');
+  }, 1500);
+}
+function closeReminder() {
+  document.getElementById('reminder-overlay').classList.remove('show');
+}
+
+// ===== INIT =====
+function init() {
+  loadState();
+
+  // Set default dates
+  document.getElementById('filter-date').value = todayStr();
+  document.getElementById('pengeluaran-date').value = todayStr();
+
+  // Init month/year filters
+  const now = new Date();
+  ['filter-month','modal-filter-month'].forEach(id => {
+    document.getElementById(id).innerHTML = MONTHS.map((m,i) => `<option value="${i}" ${i===now.getMonth()?'selected':''}>${m}</option>`).join('');
+  });
+
+  const years = [...new Set([...state.orders.map(o=>new Date(o.date).getFullYear()), ...state.modals.map(m=>new Date(m.date).getFullYear()), now.getFullYear()])].sort((a,b)=>b-a);
+  ['filter-year','modal-filter-year'].forEach(id => {
+    document.getElementById(id).innerHTML = years.map(y=>`<option value="${y}" ${y===now.getFullYear()?'selected':''}>${y}</option>`).join('');
+  });
+
+  renderOrderMenuList();
+  checkReminder();
+}
+
+init();
+</script>
+</body>
+</html>
