@@ -34,6 +34,9 @@ jobs:
             npx cap sync android
           fi
 
+      - name: Generate app icon from resources/icon.png
+        run: npx @capacitor/assets generate --android
+
       - name: Build debug APK
         run: |
           cd android
