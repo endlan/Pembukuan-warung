@@ -413,6 +413,20 @@
         <input type="number" class="form-input" id="edit-topping-asli">
       </div>
     </div>
+    <div style="border-top:1px solid #eee;margin:10px 0;padding-top:10px;">
+      <label style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600;">
+        <input type="checkbox" id="edit-topping-composite-toggle" onchange="toggleCompositeUI('edit')" style="width:16px;height:16px;">
+        Potong stok dari barang lain
+      </label>
+      <div id="edit-topping-composite-box" style="display:none;margin-top:8px;background:#f5f5f5;border-radius:8px;padding:8px;">
+        <div id="edit-topping-components-list"></div>
+        <div class="input-row" style="margin-top:6px;">
+          <select class="form-select" id="edit-topping-component-select" style="flex:2"></select>
+          <input type="number" class="form-input" id="edit-topping-component-qty" placeholder="Qty" value="1" min="1" style="flex:1">
+        </div>
+        <button class="btn btn-outline" style="margin-top:6px;" onclick="addComponentRow('edit')">+ Tambah komponen</button>
+      </div>
+    </div>
     <input type="hidden" id="edit-topping-id">
     <input type="hidden" id="edit-topping-menu-id">
     <button class="btn btn-primary" onclick="saveEditTopping()">Simpan</button>
@@ -436,6 +450,20 @@
       <div class="form-group">
         <label class="form-label">Modal (Rp)</label>
         <input type="number" class="form-input" id="add-topping-asli" placeholder="0">
+      </div>
+    </div>
+    <div style="border-top:1px solid #eee;margin:10px 0;padding-top:10px;">
+      <label style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600;">
+        <input type="checkbox" id="add-topping-composite-toggle" onchange="toggleCompositeUI('add')" style="width:16px;height:16px;">
+        Potong stok dari barang lain
+      </label>
+      <div id="add-topping-composite-box" style="display:none;margin-top:8px;background:#f5f5f5;border-radius:8px;padding:8px;">
+        <div id="add-topping-components-list"></div>
+        <div class="input-row" style="margin-top:6px;">
+          <select class="form-select" id="add-topping-component-select" style="flex:2"></select>
+          <input type="number" class="form-input" id="add-topping-component-qty" placeholder="Qty" value="1" min="1" style="flex:1">
+        </div>
+        <button class="btn btn-outline" style="margin-top:6px;" onclick="addComponentRow('add')">+ Tambah komponen</button>
       </div>
     </div>
     <input type="hidden" id="add-topping-menu-id">
@@ -1124,8 +1152,33 @@ function getTerjual(toppingId) {
   return total;
 }
 
+function findToppingDefById(id) {
+  for (const m of state.menus) {
+    const t = m.toppings.find(x => x.id === id);
+    if (t) return t;
+  }
+  return null;
+}
+
 function getTerjualGroup(ids) {
-  return ids.reduce((sum, id) => sum + getTerjual(id), 0);
+  let total = 0;
+  state.orders.forEach(o => {
+    o.items.forEach(item => {
+      item.toppings.forEach(t => {
+        if (ids.includes(t.id)) {
+          total += t.qty;
+        } else {
+          const def = findToppingDefById(t.id);
+          if (def && def.components && def.components.length) {
+            def.components.forEach(c => {
+              if (ids.includes(c.toppingId)) total += t.qty * c.qty;
+            });
+          }
+        }
+      });
+    });
+  });
+  return total;
 }
 
 function renderStok(editMode = false) {
@@ -1151,6 +1204,21 @@ function renderStok(editMode = false) {
         ${menuGroups.length === 0 ? '<div style="font-size:12px;color:var(--gray);margin-bottom:8px;">Belum ada topping/barang</div>' :
           menuGroups.map(g => {
             const canonicalId = g.ids[0];
+            const def = findToppingDefById(canonicalId);
+            const isComposite = def && def.components && def.components.length > 0;
+
+            if (isComposite) {
+              const compLabel = def.components.map(c => {
+                const compDef = findToppingDefById(c.toppingId);
+                return `${compDef ? compDef.name : '?'} ×${c.qty}`;
+              }).join(', ');
+              return `
+              <div class="card" style="margin-bottom:8px;border-style:dashed;">
+                <div style="font-size:14px;font-weight:700;margin-bottom:4px;">${g.name}</div>
+                <div style="font-size:11px;color:var(--gray);">Pakai stok dari: ${compLabel}</div>
+              </div>`;
+            }
+
             const stokData = state.stocks[canonicalId] || { total: 0, riwayat: [] };
             const terjual = getTerjualGroup(g.ids);
             const sisa = stokData.total - terjual;
@@ -1397,11 +1465,67 @@ function deleteMenu(id) {
   toast('Menu dihapus.');
 }
 
+let compositeState = { add: [], edit: [] };
+
+function populateComponentSelect(prefix, excludeId) {
+  const sel = document.getElementById(`${prefix}-topping-component-select`);
+  const options = getAllToppings().filter(t => {
+    if (t.id === excludeId) return false;
+    const def = findToppingDefById(t.id);
+    if (def && def.components && def.components.length) return false;
+    return true;
+  });
+  sel.innerHTML = options.map(t => `<option value="${t.id}">${t.name}</option>`).join('') || '<option value="">Belum ada topping lain</option>';
+}
+
+function renderComponentsList(prefix) {
+  const box = document.getElementById(`${prefix}-topping-components-list`);
+  if (compositeState[prefix].length === 0) {
+    box.innerHTML = '<div style="font-size:12px;color:var(--gray);">Belum ada komponen.</div>';
+    return;
+  }
+  box.innerHTML = compositeState[prefix].map((c, i) => {
+    const def = findToppingDefById(c.toppingId);
+    return `
+    <div style="display:flex;justify-content:space-between;align-items:center;background:#fff;border-radius:6px;padding:6px 8px;margin-bottom:4px;">
+      <span style="font-size:13px;">${def ? def.name : '?'} ×${c.qty}</span>
+      <button class="btn btn-sm btn-delete" onclick="removeComponentRow('${prefix}', ${i})">Hapus</button>
+    </div>`;
+  }).join('');
+}
+
+function addComponentRow(prefix) {
+  const sel = document.getElementById(`${prefix}-topping-component-select`);
+  const qtyInput = document.getElementById(`${prefix}-topping-component-qty`);
+  const toppingId = sel.value;
+  const qty = parseInt(qtyInput.value) || 1;
+  if (!toppingId) { toast('Pilih barangnya dulu!'); return; }
+  const existing = compositeState[prefix].find(c => c.toppingId === toppingId);
+  if (existing) { existing.qty = qty; } else { compositeState[prefix].push({ toppingId, qty }); }
+  qtyInput.value = 1;
+  renderComponentsList(prefix);
+}
+
+function removeComponentRow(prefix, index) {
+  compositeState[prefix].splice(index, 1);
+  renderComponentsList(prefix);
+}
+
+function toggleCompositeUI(prefix) {
+  const checked = document.getElementById(`${prefix}-topping-composite-toggle`).checked;
+  document.getElementById(`${prefix}-topping-composite-box`).style.display = checked ? 'block' : 'none';
+}
+
 function openAddTopping(menuId) {
   document.getElementById('add-topping-menu-id').value = menuId;
   document.getElementById('add-topping-name').value = '';
   document.getElementById('add-topping-price').value = '';
   document.getElementById('add-topping-asli').value = '';
+  compositeState.add = [];
+  document.getElementById('add-topping-composite-toggle').checked = false;
+  document.getElementById('add-topping-composite-box').style.display = 'none';
+  populateComponentSelect('add', null);
+  renderComponentsList('add');
   openModal('modal-add-topping');
 }
 function saveAddTopping() {
@@ -1412,7 +1536,9 @@ function saveAddTopping() {
   if (!name) { toast('Isi nama topping!'); return; }
   const idx = state.menus.findIndex(x => x.id === menuId);
   if (idx < 0) return;
-  state.menus[idx].toppings.push({ id: uid(), name, price, asli });
+  const isComposite = document.getElementById('add-topping-composite-toggle').checked;
+  const components = isComposite ? compositeState.add.slice() : [];
+  state.menus[idx].toppings.push({ id: uid(), name, price, asli, components });
   saveState();
   closeModal('modal-add-topping');
   renderMenuSettings();
@@ -1428,6 +1554,11 @@ function editTopping(menuId, toppingId) {
   document.getElementById('edit-topping-name').value = t.name;
   document.getElementById('edit-topping-price').value = t.price;
   document.getElementById('edit-topping-asli').value = t.asli || 0;
+  compositeState.edit = (t.components || []).map(c => ({ ...c }));
+  document.getElementById('edit-topping-composite-toggle').checked = compositeState.edit.length > 0;
+  document.getElementById('edit-topping-composite-box').style.display = compositeState.edit.length > 0 ? 'block' : 'none';
+  populateComponentSelect('edit', toppingId);
+  renderComponentsList('edit');
   openModal('modal-edit-topping');
 }
 function saveEditTopping() {
@@ -1437,11 +1568,14 @@ function saveEditTopping() {
   if (mIdx < 0) return;
   const tIdx = state.menus[mIdx].toppings.findIndex(x => x.id === toppingId);
   if (tIdx < 0) return;
+  const isComposite = document.getElementById('edit-topping-composite-toggle').checked;
+  const components = isComposite ? compositeState.edit.slice() : [];
   state.menus[mIdx].toppings[tIdx] = {
     ...state.menus[mIdx].toppings[tIdx],
     name: document.getElementById('edit-topping-name').value,
     price: parseFloat(document.getElementById('edit-topping-price').value)||0,
     asli: parseFloat(document.getElementById('edit-topping-asli').value)||0,
+    components,
   };
   saveState();
   closeModal('modal-edit-topping');
