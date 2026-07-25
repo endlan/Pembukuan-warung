@@ -220,6 +220,9 @@
   .input-row { display:flex; gap:8px; }
   .input-row .form-group { flex:1; }
 </style>
+  <script src="https://cdn.jsdelivr.net/npm/@capacitor/core@6/dist/capacitor.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@capacitor/filesystem@6/dist/plugin.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@capacitor/share@6/dist/plugin.js"></script>
 </head>
 <body>
 
@@ -1593,18 +1596,32 @@ function deleteTopping(menuId, toppingId) {
 }
 
 // ===== EXPORT / IMPORT =====
-function exportData() {
-  const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  const now = new Date();
-  a.href = url;
-  a.download = `catatan-jualan-${now.toISOString().slice(0,10)}.json`;
-  a.click();
-  URL.revokeObjectURL(url);
-  // Save last export date
-  localStorage.setItem('last_export_date', todayStr());
-  toast('✅ Data berhasil diexport!');
+async function exportData() {
+  try {
+    const { Filesystem, Share } = Capacitor.Plugins;
+    const fileName = `catatan-jualan-${todayStr()}.json`;
+    const jsonString = JSON.stringify(state, null, 2);
+
+    const result = await Filesystem.writeFile({
+      path: fileName,
+      data: jsonString,
+      directory: 'CACHE',
+      encoding: 'utf8'
+    });
+
+    await Share.share({
+      title: 'Export Data Catatan Jualan',
+      text: 'Backup data Catatan Jualan',
+      url: result.uri,
+      dialogTitle: 'Simpan atau bagikan file backup'
+    });
+
+    localStorage.setItem('last_export_date', todayStr());
+    toast('✅ Data berhasil diexport!');
+  } catch (err) {
+    console.error(err);
+    toast('❌ Gagal export: ' + err.message);
+  }
 }
 function importData(event) {
   const file = event.target.files[0];
