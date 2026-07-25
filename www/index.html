@@ -249,9 +249,9 @@
     <div style="border-top:1px solid #eee;margin-top:20px;padding-top:14px;">
       <div style="display:flex;justify-content:space-between;align-items:center;cursor:pointer;" onclick="toggleCatatanLain()">
         <div class="section-title" style="margin:0;">Catatan Lain (opsional)</div>
-        <span id="catatan-lain-arrow" style="font-size:12px;color:var(--gray);">▼</span>
+        <span id="catatan-lain-arrow" style="font-size:12px;color:var(--gray);">▲</span>
       </div>
-      <div id="catatan-lain-box" style="display:none;margin-top:10px;">
+      <div id="catatan-lain-box" style="display:block;margin-top:10px;">
         <div class="card" style="margin-bottom:10px;">
           <div class="form-group">
             <label class="form-label">💰 Pemasukan Manual — Keterangan</label>
@@ -261,7 +261,7 @@
             <label class="form-label">Jumlah (Rp)</label>
             <input type="number" class="form-input" id="order-pemasukan-amount" placeholder="0">
           </div>
-          <button class="btn btn-green btn-sm" style="width:100%;" onclick="submitOrderPemasukan()">+ Catat Pemasukan</button>
+          <button style="width:100%;padding:13px 20px;font-size:14px;border-radius:10px;border:none;background:var(--green);color:#fff;font-family:'Plus Jakarta Sans',sans-serif;font-weight:700;" onclick="submitOrderPemasukan()">💰 Catat Pemasukan</button>
         </div>
         <div class="card">
           <div class="form-group">
@@ -272,7 +272,7 @@
             <label class="form-label">Jumlah (Rp)</label>
             <input type="number" class="form-input" id="order-pengeluaran-amount" placeholder="0">
           </div>
-          <button class="btn btn-sm" style="width:100%;" onclick="submitOrderPengeluaran()">+ Catat Pengeluaran</button>
+          <button style="width:100%;padding:13px 20px;font-size:14px;border-radius:10px;border:none;background:var(--red);color:#fff;font-family:'Plus Jakarta Sans',sans-serif;font-weight:700;" onclick="submitOrderPengeluaran()">💸 Catat Pengeluaran</button>
         </div>
       </div>
     </div>
@@ -558,6 +558,8 @@
   </div>
 </div>
 
+<script src="capacitor-plugins/filesystem.js"></script>
+<script src="capacitor-plugins/share.js"></script>
 <script>
 // ===== STATE =====
 const MONTHS = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
@@ -1712,16 +1714,53 @@ function deleteTopping(menuId, toppingId) {
 }
 
 // ===== EXPORT / IMPORT =====
-function exportData() {
-  const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
+function getCapPlugin(globalName, pluginName) {
+  if (window[globalName] && window[globalName][pluginName]) return window[globalName][pluginName];
+  if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins[pluginName]) return window.Capacitor.Plugins[pluginName];
+  return null;
+}
+
+async function exportData() {
+  const now = new Date();
+  const filename = `catatan-jualan-${now.toISOString().slice(0,10)}.json`;
+  const dataStr = JSON.stringify(state, null, 2);
+  const isNative = window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform();
+
+  if (isNative) {
+    try {
+      const Filesystem = getCapPlugin('CapacitorFilesystem', 'Filesystem');
+      const Share = getCapPlugin('CapacitorShare', 'Share');
+      const DirectoryEnum = (window.CapacitorFilesystem && window.CapacitorFilesystem.Directory) || { Cache: 'CACHE' };
+      const EncodingEnum = (window.CapacitorFilesystem && window.CapacitorFilesystem.Encoding) || { UTF8: 'utf8' };
+      if (Filesystem && Share) {
+        const writeResult = await Filesystem.writeFile({
+          path: filename,
+          data: dataStr,
+          directory: DirectoryEnum.Cache,
+          encoding: EncodingEnum.UTF8,
+        });
+        await Share.share({
+          title: 'Export Data Catatan Jualan',
+          url: writeResult.uri,
+          dialogTitle: 'Simpan atau bagikan file backup ke...',
+        });
+        localStorage.setItem('last_export_date', todayStr());
+        toast('✅ Data berhasil diexport!');
+        return;
+      }
+    } catch (err) {
+      console.error('Native export gagal, pakai cara biasa:', err);
+    }
+  }
+
+  // Fallback: download biasa lewat browser (dipakai kalau dibuka di browser PC/tidak ada plugin native)
+  const blob = new Blob([dataStr], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
-  const now = new Date();
   a.href = url;
-  a.download = `catatan-jualan-${now.toISOString().slice(0,10)}.json`;
+  a.download = filename;
   a.click();
   URL.revokeObjectURL(url);
-  // Save last export date
   localStorage.setItem('last_export_date', todayStr());
   toast('✅ Data berhasil diexport!');
 }
