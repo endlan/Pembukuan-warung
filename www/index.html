@@ -536,6 +536,28 @@
   </div>
 </div>
 
+<!-- Modal Edit Pemasukan Manual -->
+<div class="modal-overlay" id="modal-edit-pemasukan">
+  <div class="modal">
+    <div class="modal-title">Edit Pemasukan</div>
+    <div class="form-group">
+      <label class="form-label">Tanggal</label>
+      <input type="date" class="form-input" id="edit-pemasukan-date">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Keterangan</label>
+      <input type="text" class="form-input" id="edit-pemasukan-desc">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Jumlah (Rp)</label>
+      <input type="number" class="form-input" id="edit-pemasukan-amount">
+    </div>
+    <input type="hidden" id="edit-pemasukan-id">
+    <button class="btn btn-primary" onclick="saveEditPemasukan()">Simpan</button>
+    <button class="btn btn-outline" style="margin-top:8px;" onclick="closeModal('modal-edit-pemasukan')">Batal</button>
+  </div>
+</div>
+
 <!-- Modal Edit Stok Semua -->
 <div class="modal-overlay" id="modal-edit-stok-semua">
   <div class="modal-box">
@@ -828,6 +850,7 @@ function renderHarian() {
       </div>
       <div style="display:flex;align-items:center;gap:8px;">
         <span style="font-size:14px;font-weight:800;color:var(--green);">${rp(m.amount)}</span>
+        <button class="btn btn-sm btn-edit" onclick="editHarianPemasukan('${m.id}')">Edit</button>
         <button class="btn btn-sm btn-delete" onclick="deleteHarianPemasukan('${m.id}')">Hapus</button>
       </div>
     </div>
@@ -846,6 +869,7 @@ function renderHarian() {
         </div>
         <div style="display:flex;align-items:center;gap:8px;">
           <span style="font-size:14px;font-weight:800;color:var(--red);">${rp(m.amount)}</span>
+          <button class="btn btn-sm btn-edit" onclick="editModal('${m.id}')">Edit</button>
           <button class="btn btn-sm btn-delete" onclick="deleteHarianPengeluaran('${m.id}')">Hapus</button>
         </div>
       </div>
@@ -939,6 +963,35 @@ function deleteHarianPemasukan(id) {
   saveState();
   renderHarian();
   toast('Pemasukan dihapus.');
+}
+
+function editHarianPemasukan(id) {
+  const m = state.pemasukanManual.find(x => x.id === id);
+  if (!m) return;
+  document.getElementById('edit-pemasukan-id').value = id;
+  document.getElementById('edit-pemasukan-date').value = m.date;
+  document.getElementById('edit-pemasukan-desc').value = m.desc;
+  document.getElementById('edit-pemasukan-amount').value = m.amount;
+  openModal('modal-edit-pemasukan');
+}
+function saveEditPemasukan() {
+  const id = document.getElementById('edit-pemasukan-id').value;
+  const idx = state.pemasukanManual.findIndex(x => x.id === id);
+  if (idx < 0) return;
+  const desc = document.getElementById('edit-pemasukan-desc').value.trim();
+  const amount = parseFloat(document.getElementById('edit-pemasukan-amount').value);
+  if (!desc) { toast('Isi keterangan dulu!'); return; }
+  if (!amount || amount <= 0) { toast('Isi jumlah yang valid!'); return; }
+  state.pemasukanManual[idx] = {
+    ...state.pemasukanManual[idx],
+    date: document.getElementById('edit-pemasukan-date').value,
+    desc,
+    amount,
+  };
+  saveState();
+  closeModal('modal-edit-pemasukan');
+  renderHarian();
+  toast('Pemasukan diperbarui!');
 }
 
 function submitHarianPengeluaran() {
@@ -1525,6 +1578,7 @@ function saveEditModal() {
   saveState();
   closeModal('modal-edit-modal');
   renderModal();
+  renderHarian();
   toast('Pengeluaran diperbarui!');
 }
 function deleteModal(id) {
