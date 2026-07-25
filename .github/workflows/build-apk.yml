@@ -20,6 +20,12 @@ jobs:
           java-version: '17'
       - name: Install dependencies
         run: npm install
+      - name: Copy native plugin JS into www (for Export/Share)
+        run: |
+          mkdir -p www/capacitor-plugins
+          cp node_modules/@capacitor/filesystem/dist/plugin.js www/capacitor-plugins/filesystem.js
+          cp node_modules/@capacitor/share/dist/plugin.js www/capacitor-plugins/share.js
+          ls -la www/capacitor-plugins
       - name: Add or sync Android platform
         run: |
           if [ ! -d "android" ]; then
