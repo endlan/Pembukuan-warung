@@ -1313,58 +1313,74 @@ function renderStok(editMode = false) {
       }
     </div>
     ${menus.map(m => {
-      const menuGroups = sortByName(groups.filter(g => g.menuId === m.id));
+      const menuGroups = sortByName(groups.filter(g => g.menuId === m.id && !isGroupComposite(g)));
       return `
       <div style="margin-bottom:18px;">
         <div style="background:var(--dark);color:#fff;font-size:12px;font-weight:800;letter-spacing:1px;text-transform:uppercase;padding:8px 12px;border-radius:8px;margin-bottom:8px;">${m.name}</div>
         ${menuGroups.length === 0 ? '<div style="font-size:12px;color:var(--gray);margin-bottom:8px;">Belum ada topping/barang</div>' :
-          menuGroups.map(g => {
-            const canonicalId = g.ids[0];
-            const def = findToppingDefById(canonicalId);
-            const isComposite = def && def.components && def.components.length > 0;
-
-            if (isComposite) {
-              const compLabel = def.components.map(c => {
-                const compDef = findToppingDefById(c.toppingId);
-                return `${compDef ? compDef.name : '?'} ×${c.qty}`;
-              }).join(', ');
-              return `
-              <div class="card" style="margin-bottom:8px;border-style:dashed;">
-                <div style="font-size:14px;font-weight:700;margin-bottom:4px;">${g.name}</div>
-                <div style="font-size:11px;color:var(--gray);">Pakai stok dari: ${compLabel}</div>
-              </div>`;
-            }
-
-            const stokData = state.stocks[canonicalId] || { total: 0, riwayat: [] };
-            const terjual = getTerjualGroup(g.ids);
-            const sisa = stokData.total - terjual;
-            const sisaColor = sisa <= 0 ? '#ff7c7c' : sisa <= 5 ? 'var(--yellow)' : 'var(--green)';
-            return `
-            <div class="card" style="margin-bottom:8px;">
-              <div style="font-size:14px;font-weight:700;margin-bottom:8px;">${g.name}</div>
-              <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;text-align:center;">
-                <div style="background:#f5f5f5;border-radius:8px;padding:8px;">
-                  <div style="font-size:10px;color:var(--gray);margin-bottom:4px;">STOK</div>
-                  ${editMode
-                    ? `<input type="number" id="stok-input-${canonicalId}" value="${stokData.total}" min="0"
-                         style="width:100%;border:2px solid var(--primary);border-radius:6px;padding:4px;font-size:16px;font-weight:800;text-align:center;background:#fff;">`
-                    : `<div style="font-size:16px;font-weight:800;">${stokData.total}</div>`
-                  }
-                </div>
-                <div style="background:#f5f5f5;border-radius:8px;padding:8px;">
-                  <div style="font-size:10px;color:var(--gray);margin-bottom:2px;">TERJUAL</div>
-                  <div style="font-size:16px;font-weight:800;color:var(--red);">${terjual}</div>
-                </div>
-                <div style="background:#f5f5f5;border-radius:8px;padding:8px;">
-                  <div style="font-size:10px;color:var(--gray);margin-bottom:2px;">SISA</div>
-                  <div style="font-size:16px;font-weight:800;color:${sisaColor};">${sisa}</div>
-                </div>
-              </div>
-            </div>`;
-          }).join('')}
+          menuGroups.map(g => renderStokCard(g, editMode)).join('')}
       </div>`;
     }).join('')}
+    ${(() => {
+      const compositeGroups = sortByName(groups.filter(g => isGroupComposite(g)));
+      if (compositeGroups.length === 0) return '';
+      return `
+      <div style="margin-bottom:18px;">
+        <div style="background:var(--gray);color:#fff;font-size:12px;font-weight:800;letter-spacing:1px;text-transform:uppercase;padding:8px 12px;border-radius:8px;margin-bottom:8px;">BARANG KOMPOSISI (nempel stok item lain)</div>
+        ${compositeGroups.map(g => renderStokCard(g, editMode)).join('')}
+      </div>`;
+    })()}
   `;
+}
+
+function isGroupComposite(g) {
+  const def = findToppingDefById(g.ids[0]);
+  return !!(def && def.components && def.components.length > 0);
+}
+
+function renderStokCard(g, editMode) {
+  const canonicalId = g.ids[0];
+  const def = findToppingDefById(canonicalId);
+  const isComposite = def && def.components && def.components.length > 0;
+
+  if (isComposite) {
+    const compLabel = def.components.map(c => {
+      const compDef = findToppingDefById(c.toppingId);
+      return `${compDef ? compDef.name : '?'} ×${c.qty}`;
+    }).join(', ');
+    return `
+    <div class="card" style="margin-bottom:8px;border-style:dashed;">
+      <div style="font-size:14px;font-weight:700;margin-bottom:4px;">${g.name}</div>
+      <div style="font-size:11px;color:var(--gray);">Pakai stok dari: ${compLabel}</div>
+    </div>`;
+  }
+
+  const stokData = state.stocks[canonicalId] || { total: 0, riwayat: [] };
+  const terjual = getTerjualGroup(g.ids);
+  const sisa = stokData.total - terjual;
+  const sisaColor = sisa <= 0 ? '#ff7c7c' : sisa <= 5 ? 'var(--yellow)' : 'var(--green)';
+  return `
+  <div class="card" style="margin-bottom:8px;">
+    <div style="font-size:14px;font-weight:700;margin-bottom:8px;">${g.name}</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;text-align:center;">
+      <div style="background:#f5f5f5;border-radius:8px;padding:8px;">
+        <div style="font-size:10px;color:var(--gray);margin-bottom:4px;">STOK</div>
+        ${editMode
+          ? `<input type="number" id="stok-input-${canonicalId}" value="${stokData.total}" min="0"
+               style="width:100%;border:2px solid var(--primary);border-radius:6px;padding:4px;font-size:16px;font-weight:800;text-align:center;background:#fff;">`
+          : `<div style="font-size:16px;font-weight:800;">${stokData.total}</div>`
+        }
+      </div>
+      <div style="background:#f5f5f5;border-radius:8px;padding:8px;">
+        <div style="font-size:10px;color:var(--gray);margin-bottom:2px;">TERJUAL</div>
+        <div style="font-size:16px;font-weight:800;color:var(--red);">${terjual}</div>
+      </div>
+      <div style="background:#f5f5f5;border-radius:8px;padding:8px;">
+        <div style="font-size:10px;color:var(--gray);margin-bottom:2px;">SISA</div>
+        <div style="font-size:16px;font-weight:800;color:${sisaColor};">${sisa}</div>
+      </div>
+    </div>
+  </div>`;
 }
 
 function simpanEditStok() {
@@ -1730,13 +1746,13 @@ async function exportData() {
     try {
       const Filesystem = getCapPlugin('CapacitorFilesystem', 'Filesystem');
       const Share = getCapPlugin('CapacitorShare', 'Share');
-      const DirectoryEnum = (window.CapacitorFilesystem && window.CapacitorFilesystem.Directory) || { Cache: 'CACHE' };
+      const DirectoryEnum = (window.CapacitorFilesystem && window.CapacitorFilesystem.Directory) || { Documents: 'DOCUMENTS' };
       const EncodingEnum = (window.CapacitorFilesystem && window.CapacitorFilesystem.Encoding) || { UTF8: 'utf8' };
       if (Filesystem && Share) {
         const writeResult = await Filesystem.writeFile({
           path: filename,
           data: dataStr,
-          directory: DirectoryEnum.Cache,
+          directory: DirectoryEnum.Documents,
           encoding: EncodingEnum.UTF8,
         });
         await Share.share({
@@ -1745,7 +1761,7 @@ async function exportData() {
           dialogTitle: 'Simpan atau bagikan file backup ke...',
         });
         localStorage.setItem('last_export_date', todayStr());
-        toast('✅ Data berhasil diexport!');
+        toast('✅ Tersimpan di folder Documents!');
         return;
       }
     } catch (err) {
