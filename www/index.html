@@ -288,7 +288,15 @@
     </div>
   </div>
   <div class="scroll-content">
-    <input type="hidden" id="filter-date">
+    <div class="input-row" style="margin-bottom:16px;">
+      <div class="form-group" style="flex:2">
+        <label class="form-label">Tanggal</label>
+        <input type="date" class="form-input" id="filter-date" onchange="renderHarian()">
+      </div>
+      <div class="form-group" style="flex:1;justify-content:flex-end;display:flex;">
+        <button class="btn btn-sm btn-edit" onclick="goToHarianToday()" style="width:100%;">📅 Hari Ini</button>
+      </div>
+    </div>
     <div id="harian-stats"></div>
 
     <div class="section-title">Pemasukan Manual</div>
@@ -385,7 +393,7 @@
     <span class="nav-icon">🛒</span>
     <span class="nav-label">Order</span>
   </button>
-  <button class="nav-btn" onclick="showPage('page-harian')" data-page="page-harian">
+  <button class="nav-btn" onclick="document.getElementById('filter-date').value=todayStr();showPage('page-harian')" data-page="page-harian">
     <span class="nav-icon">📅</span>
     <span class="nav-label">Harian</span>
   </button>
@@ -637,6 +645,10 @@ function fmtDateShort(str) {
 function todayStr() { return new Date().toISOString().slice(0,10); }
 
 // ===== NAVIGATION =====
+  function goToHarianToday() {
+  document.getElementById('filter-date').value = todayStr();
+  renderHarian();
+}
 function showPage(pageId) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.getElementById(pageId).classList.add('active');
