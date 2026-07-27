@@ -382,7 +382,11 @@
         <button class="btn btn-green btn-sm" style="flex:1;padding:12px;" onclick="exportData()">📤 Export Data</button>
         <button class="btn btn-edit btn-sm" style="flex:1;padding:12px;" onclick="document.getElementById('import-file').click()">📥 Import Data</button>
       </div>
+      <button class="btn btn-sm" style="width:100%;margin-top:8px;" onclick="debugCapacitorInfo()">🔍 Cek Status Sistem</button>
+      <div style="display:none">
+      </div>
       <input type="file" id="import-file" accept=".json" style="display:none" onchange="importData(event)">
+      <button class="btn btn-sm" style="width:100%;margin-top:8px;" onclick="debugCapacitorInfo()">🔍 Cek Status Sistem</button>
     </div>
   </div>
 </div>
@@ -1801,7 +1805,19 @@ function getCapPlugin(globalName, pluginName) {
   if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins[pluginName]) return window.Capacitor.Plugins[pluginName];
   return null;
 }
-
+function debugCapacitorInfo() {
+  const info = {
+    hasCapacitor: !!window.Capacitor,
+    isNativePlatform: !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()),
+    platform: (window.Capacitor && window.Capacitor.getPlatform) ? window.Capacitor.getPlatform() : 'unknown',
+    hasPluginsObj: !!(window.Capacitor && window.Capacitor.Plugins),
+    hasFilesystemPlugin: !!(window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Filesystem),
+    hasSharePlugin: !!(window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Share),
+    hasGlobalCapFS: !!window.CapacitorFilesystem,
+    hasGlobalCapShare: !!window.CapacitorShare,
+  };
+  alert(JSON.stringify(info, null, 2));
+}
 async function exportData() {
   const now = new Date();
   const filename = `catatan-jualan-${now.toISOString().slice(0,10)}.json`;
