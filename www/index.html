@@ -1834,7 +1834,7 @@ async function exportData() {
         const writeResult = await Filesystem.writeFile({
           path: filename,
           data: dataStr,
-          directory: DirectoryEnum.Documents,
+          directory: 'CACHE',
           encoding: EncodingEnum.UTF8,
         });
         await Share.share({
