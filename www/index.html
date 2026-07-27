@@ -839,19 +839,22 @@ function renderHarian() {
   const orders = state.orders.filter(o => o.date === date);
 
   // Stats
-  const totalBayar = orders.filter(o => o.status === 'bayar').reduce((s, o) => s + o.grandTotal, 0);
-  const totalGratis = orders.filter(o => o.status === 'gratis').reduce((s, o) => s + o.grandTotal, 0);
-  const totalPenjualan = totalBayar + totalGratis;
-  const hargaAsliTerjual = orders.reduce((s, o) => s + (o.grandAsli||0), 0);
+  const ordersBayar = orders.filter(o => o.status === 'bayar');
+  const ordersGratis = orders.filter(o => o.status === 'gratis');
+  const totalBayar = ordersBayar.reduce((s, o) => s + o.grandTotal, 0);
+  const totalGratis = ordersGratis.reduce((s, o) => s + o.grandTotal, 0);
   const modalManual = state.modals.filter(m => m.date === date).reduce((s, m) => s + m.amount, 0);
   const pemasukanManualTotal = state.pemasukanManual.filter(m => m.date === date).reduce((s, m) => s + m.amount, 0);
+  const totalPenjualan = totalBayar + totalGratis + pemasukanManualTotal;
+  const hargaAsliTerjual = orders.reduce((s, o) => s + (o.grandAsli||0), 0);
   const totalDikurang = hargaAsliTerjual + modalManual;
   const bersih = totalBayar + pemasukanManualTotal - totalDikurang;
 
   document.getElementById('harian-stats').innerHTML = `
     <div class="stat-grid">
-      <div class="stat-card full"><div class="stat-label">Total Penjualan <span style="font-size:10px;color:var(--gray);font-weight:400;">(termasuk gratis ${rp(totalGratis)})</span></div><div class="stat-value" style="color:var(--green)">${rp(totalPenjualan)}</div></div>
+      <div class="stat-card full"><div class="stat-label">Total Penjualan <span style="font-size:10px;color:var(--gray);font-weight:400;">(termasuk gratis ${rp(totalGratis)} & pemasukan manual ${rp(pemasukanManualTotal)})</span></div><div class="stat-value" style="color:var(--green)">${rp(totalPenjualan)}</div></div>
       <div class="stat-card"><div class="stat-label">Modal Terjual</div><div class="stat-value" style="color:var(--red)">${rp(hargaAsliTerjual)}</div></div>
+      <div class="stat-card"><div class="stat-label">Total Gratis</div><div class="stat-value" style="color:#e0a020">${rp(totalGratis)}</div></div>
       <div class="stat-card"><div class="stat-label">Pengeluaran Manual</div><div class="stat-value" style="color:var(--red)">${rp(modalManual)}</div></div>
       <div class="stat-card"><div class="stat-label">Pemasukan Manual</div><div class="stat-value" style="color:var(--green)">${rp(pemasukanManualTotal)}</div></div>
       <div class="stat-card"><div class="stat-label">Total Bayar</div><div class="stat-value" style="color:var(--green)">${rp(totalBayar)}</div></div>
