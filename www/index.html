@@ -1845,16 +1845,15 @@ async function exportData() {
         localStorage.setItem('last_export_date', todayStr());
         toast('✅ Tersimpan di folder Documents!');
         return;
+      } else {
+        alert('DEBUG: Plugin Filesystem/Share tidak ditemukan (null) di device ini.');
+        return;
       }
-      } catch (err) {
-      console.error('Native export gagal, pakai cara biasa:', err);
-      toast('⚠️ Gagal simpan via native, coba cara lama...');
+    } catch (err) {
+      alert('DEBUG Export gagal: ' + (err && err.message ? err.message : JSON.stringify(err)));
+      return;
     }
   }
-  if (isNative) {
-    toast('⚠️ Fitur simpan file belum aktif, hubungi pengembang');
-  }
-
   // Fallback: download biasa lewat browser (dipakai kalau dibuka di browser PC/tidak ada plugin native)
   const blob = new Blob([dataStr], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
