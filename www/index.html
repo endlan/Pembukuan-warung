@@ -536,9 +536,9 @@
 
 <!-- Modal Edit Stok Semua -->
 <div class="modal-overlay" id="modal-edit-stok-semua">
-  <div class="modal-box">
-    <div class="modal-title">✏️ Edit Stok Topping</div>
-    <div style="font-size:12px;color:var(--gray);margin-bottom:12px;">Isi jumlah yang ingin ditambahkan. Kosongkan jika tidak ada perubahan.</div>
+  <div class="modal">
+    <div class="modal-title">📦 Restock Barang</div>
+    <div style="font-size:12px;color:var(--gray);margin-bottom:12px;">Isi jumlah barang baru yang ditambahkan. Kosongkan jika tidak ada perubahan.</div>
     <div id="edit-stok-semua-form"></div>
     <button class="btn btn-primary" onclick="submitEditStokSemua()">Simpan Stok</button>
     <button class="btn btn-outline" style="margin-top:8px;" onclick="closeModal('modal-edit-stok-semua')">Batal</button>
@@ -1345,15 +1345,24 @@ function openEditStokSemua() {
     const def = findToppingDefById(g.ids[0]);
     return !(def && def.components && def.components.length > 0);
   });
-  document.getElementById('edit-stok-semua-form').innerHTML = groups.map(g => {
-    const canonicalId = g.ids[0];
-    const stokData = state.stocks[canonicalId] || { total: 0, baselineDate: null };
-    const terjual = getTerjualSince(g.ids, stokData.baselineDate);
-    const sisa = stokData.total - terjual;
+  const menus = sortByName(state.menus);
+  document.getElementById('edit-stok-semua-form').innerHTML = menus.map(m => {
+    const menuGroups = sortByName(groups.filter(g => g.menuId === m.id));
+    if (menuGroups.length === 0) return '';
     return `
-      <div class="form-group" style="margin-bottom:10px;">
-        <label class="form-label">${g.name} <span style="color:var(--gray);font-weight:400;">(sisa saat ini: ${sisa})</span></label>
-        <input type="number" class="form-input" id="restok-input-${canonicalId}" placeholder="0" min="0">
+      <div style="margin-bottom:14px;">
+        <div style="background:var(--dark);color:#fff;font-size:11px;font-weight:800;letter-spacing:1px;text-transform:uppercase;padding:6px 10px;border-radius:8px;margin-bottom:8px;">${m.name}</div>
+        ${menuGroups.map(g => {
+          const canonicalId = g.ids[0];
+          const stokData = state.stocks[canonicalId] || { total: 0, baselineDate: null };
+          const terjual = getTerjualSince(g.ids, stokData.baselineDate);
+          const sisa = stokData.total - terjual;
+          return `
+          <div class="form-group" style="margin-bottom:10px;">
+            <label class="form-label">${g.name} <span style="color:var(--gray);font-weight:400;">(sisa saat ini: ${sisa})</span></label>
+            <input type="number" class="form-input" id="restok-input-${canonicalId}" placeholder="0" min="0">
+          </div>`;
+        }).join('')}
       </div>`;
   }).join('');
   openModal('modal-edit-stok-semua');
