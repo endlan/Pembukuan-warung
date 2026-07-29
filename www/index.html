@@ -1218,11 +1218,10 @@ function findToppingDefById(id) {
   return null;
 }
 
-function getTerjualGroup(ids, todayOnly = false) {
+function getTerjualSince(ids, sinceDate) {
   let total = 0;
-  const today = todayStr();
   state.orders.forEach(o => {
-    if (todayOnly && o.date !== today) return;
+    if (sinceDate && o.date < sinceDate) return;
     o.items.forEach(item => {
       item.toppings.forEach(t => {
         if (ids.includes(t.id)) {
@@ -1253,7 +1252,8 @@ function renderStok(editMode = false) {
       ${editMode
         ? `<button class="btn btn-primary" onclick="simpanEditStok()">💾 Simpan</button>
            <button class="btn btn-outline" style="margin-left:6px;" onclick="renderStok(false)">Batal</button>`
-        : `<button class="btn btn-primary" onclick="renderStok(true)">✏️ Edit Stok</button>`
+        : `<button class="btn btn-primary" onclick="openEditStokSemua()">📦 Restock</button>
+           <button class="btn btn-outline" style="margin-left:6px;" onclick="renderStok(true)">✏️ Edit Stok</button>`
       }
     </div>
     ${menus.map(m => {
@@ -1287,10 +1287,9 @@ function renderStok(editMode = false) {
               </div>`;
             }
 
-            const stokData = state.stocks[canonicalId] || { total: 0, riwayat: [] };
-            const terjualHariIni = getTerjualGroup(g.ids, true);
-            const terjualTotal = getTerjualGroup(g.ids, false);
-            const sisa = stokData.total - terjualTotal;
+            const stokData = state.stocks[canonicalId] || { total: 0, baselineDate: null, riwayat: [] };
+            const terjual = getTerjualSince(g.ids, stokData.baselineDate);
+            const sisa = stokData.total - terjual;
             const sisaColor = sisa <= 0 ? '#ff7c7c' : sisa <= 5 ? 'var(--yellow)' : 'var(--green)';
             return `
             <div class="card" style="margin-bottom:8px;">
@@ -1305,8 +1304,8 @@ function renderStok(editMode = false) {
                   }
                 </div>
                 <div style="background:#f5f5f5;border-radius:8px;padding:8px;">
-                  <div style="font-size:10px;color:var(--gray);margin-bottom:2px;">TERJUAL HARI INI</div>
-                  <div style="font-size:16px;font-weight:800;color:var(--red);">${terjualHariIni}</div>
+                  <div style="font-size:10px;color:var(--gray);margin-bottom:2px;">TERJUAL</div>
+                  <div style="font-size:16px;font-weight:800;color:var(--red);">${terjual}</div>
                 </div>
                 <div style="background:#f5f5f5;border-radius:8px;padding:8px;">
                   <div style="font-size:10px;color:var(--gray);margin-bottom:2px;">SISA</div>
@@ -1327,11 +1326,12 @@ function simpanEditStok() {
     const input = document.getElementById(`stok-input-${canonicalId}`);
     if (!input) return;
     const val = parseInt(input.value) || 0;
-    if (!state.stocks[canonicalId]) state.stocks[canonicalId] = { total: 0, riwayat: [] };
+    if (!state.stocks[canonicalId]) state.stocks[canonicalId] = { total: 0, baselineDate: null, riwayat: [] };
     state.stocks[canonicalId].total = val;
+    state.stocks[canonicalId].baselineDate = todayStr();
     // Keep other ids sharing this name in sync at 0 so totals never double-count.
     g.ids.slice(1).forEach(otherId => {
-      if (!state.stocks[otherId]) state.stocks[otherId] = { total: 0, riwayat: [] };
+      if (!state.stocks[otherId]) state.stocks[otherId] = { total: 0, baselineDate: null, riwayat: [] };
       state.stocks[otherId].total = 0;
     });
   });
@@ -1340,18 +1340,41 @@ function simpanEditStok() {
   toast('✅ Stok berhasil disimpan!');
 }
 
-function openEditStokSemua() {}
-function submitEditStokSemua() {}
+function openEditStokSemua() {
+  const groups = getToppingGroups().filter(g => {
+    const def = findToppingDefById(g.ids[0]);
+    return !(def && def.components && def.components.length > 0);
+  });
+  document.getElementById('edit-stok-semua-form').innerHTML = groups.map(g => {
+    const canonicalId = g.ids[0];
+    const stokData = state.stocks[canonicalId] || { total: 0, baselineDate: null };
+    const terjual = getTerjualSince(g.ids, stokData.baselineDate);
+    const sisa = stokData.total - terjual;
+    return `
+      <div class="form-group" style="margin-bottom:10px;">
+        <label class="form-label">${g.name} <span style="color:var(--gray);font-weight:400;">(sisa saat ini: ${sisa})</span></label>
+        <input type="number" class="form-input" id="restok-input-${canonicalId}" placeholder="0" min="0">
+      </div>`;
+  }).join('');
+  openModal('modal-edit-stok-semua');
+}
 
 function submitEditStokSemua() {
-  const toppings = getAllToppings();
+  const groups = getToppingGroups();
   let ada = false;
-  toppings.forEach(t => {
-    const val = parseInt(document.getElementById(`stok-input-${t.id}`).value);
+  groups.forEach(g => {
+    const canonicalId = g.ids[0];
+    const input = document.getElementById(`restok-input-${canonicalId}`);
+    if (!input) return;
+    const val = parseInt(input.value) || 0;
     if (val > 0) {
-      if (!state.stocks[t.id]) state.stocks[t.id] = { total: 0, riwayat: [] };
-      state.stocks[t.id].total += val;
-      state.stocks[t.id].riwayat.push({ date: todayStr(), jumlah: val, catatan: '' });
+      if (!state.stocks[canonicalId]) state.stocks[canonicalId] = { total: 0, baselineDate: null, riwayat: [] };
+      const stokData = state.stocks[canonicalId];
+      const terjualSejakBaseline = getTerjualSince(g.ids, stokData.baselineDate);
+      const sisaSekarang = stokData.total - terjualSejakBaseline;
+      stokData.total = sisaSekarang + val;
+      stokData.baselineDate = todayStr();
+      stokData.riwayat.push({ date: todayStr(), jumlah: val, catatan: '' });
       ada = true;
     }
   });
@@ -1359,7 +1382,7 @@ function submitEditStokSemua() {
   saveState();
   closeModal('modal-edit-stok-semua');
   renderStok();
-  toast('✅ Stok berhasil diperbarui!');
+  toast('✅ Restok berhasil disimpan!');
 }
 
 // ===== MODAL/PENGELUARAN =====
