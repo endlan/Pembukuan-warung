@@ -1257,7 +1257,15 @@ function renderStok(editMode = false) {
       }
     </div>
     ${menus.map(m => {
-      const menuGroups = sortByName(groups.filter(g => g.menuId === m.id));
+      const menuGroupsSorted = sortByName(groups.filter(g => g.menuId === m.id));
+      const isCompositeGroup = g => {
+        const def = findToppingDefById(g.ids[0]);
+        return !!(def && def.components && def.components.length > 0);
+      };
+      const menuGroups = [
+        ...menuGroupsSorted.filter(g => !isCompositeGroup(g)),
+        ...menuGroupsSorted.filter(g => isCompositeGroup(g)),
+      ];
       return `
       <div style="margin-bottom:18px;">
         <div style="background:var(--dark);color:#fff;font-size:12px;font-weight:800;letter-spacing:1px;text-transform:uppercase;padding:8px 12px;border-radius:8px;margin-bottom:8px;">${m.name}</div>
