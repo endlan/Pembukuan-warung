@@ -249,23 +249,7 @@
     </div>
     <button class="btn btn-accent" onclick="submitOrder()">✓ Selesai — Simpan Order</button>
 
-    <div class="section-title">💸 Pengeluaran Manual</div>
-    <div class="card" id="order-pengeluaran-form">
-      <div class="input-row">
-        <div class="form-group" style="flex:2">
-          <label class="form-label">Keterangan</label>
-          <input type="text" class="form-input" id="order-pengeluaran-desc" placeholder="Misal: Pengamen, sumbangan...">
-        </div>
-        <div class="form-group" style="flex:1">
-          <label class="form-label">Jumlah (Rp)</label>
-          <input type="number" class="form-input" id="order-pengeluaran-amount" placeholder="0">
-        </div>
-      </div>
-      <button class="btn btn-primary" onclick="submitOrderPengeluaran()">+ Catat Pengeluaran</button>
-    </div>
-    <div id="order-pengeluaran-list"></div>
-
-    <div class="section-title">💰 Pemasukan Manual</div>
+    <div class="section-title" style="color:var(--green);font-size:13px;">💰 Pemasukan Manual</div>
     <div class="card" id="order-pemasukan-form">
       <div class="input-row">
         <div class="form-group" style="flex:2">
@@ -279,7 +263,21 @@
       </div>
       <button class="btn btn-primary" onclick="submitOrderPemasukan()">+ Catat Pemasukan</button>
     </div>
-    <div id="order-pemasukan-list"></div>
+
+    <div class="section-title" style="color:var(--red);font-size:13px;">💸 Pengeluaran Manual</div>
+    <div class="card" id="order-pengeluaran-form">
+      <div class="input-row">
+        <div class="form-group" style="flex:2">
+          <label class="form-label">Keterangan</label>
+          <input type="text" class="form-input" id="order-pengeluaran-desc" placeholder="Misal: Pengamen, sumbangan...">
+        </div>
+        <div class="form-group" style="flex:1">
+          <label class="form-label">Jumlah (Rp)</label>
+          <input type="number" class="form-input" id="order-pengeluaran-amount" placeholder="0">
+        </div>
+      </div>
+      <button class="btn btn-primary" onclick="submitOrderPengeluaran()">+ Catat Pengeluaran</button>
+    </div>
   </div>
 </div>
 
@@ -294,6 +292,12 @@
   <div class="scroll-content">
     <input type="hidden" id="filter-date">
     <div id="harian-stats"></div>
+
+    <div class="section-title" style="color:var(--green);">💰 Pemasukan Manual</div>
+    <div id="harian-pemasukan-list"></div>
+
+    <div class="section-title" style="color:var(--red);">💸 Pengeluaran Manual</div>
+    <div id="harian-pengeluaran-list"></div>
 
     <div class="section-title">Detail Order</div>
     <div id="harian-list"></div>
@@ -515,7 +519,7 @@
 <!-- Modal Edit Modal/Pengeluaran -->
 <div class="modal-overlay" id="modal-edit-modal">
   <div class="modal">
-    <div class="modal-title">Edit Pengeluaran</div>
+    <div class="modal-title" id="edit-modal-title">Edit Pengeluaran</div>
     <div class="form-group">
       <label class="form-label">Tanggal</label>
       <input type="date" class="form-input" id="edit-modal-date">
@@ -808,13 +812,43 @@ function renderHarian() {
   document.getElementById('harian-stats').innerHTML = `
     <div class="stat-grid">
       <div class="stat-card full"><div class="stat-label">Total Penjualan <span style="font-size:10px;color:var(--gray);font-weight:400;">(termasuk gratis ${rp(totalGratis)})</span></div><div class="stat-value" style="color:var(--green)">${rp(totalPenjualan)}</div></div>
-      <div class="stat-card"><div class="stat-label">Modal Terjual</div><div class="stat-value" style="color:var(--red)">${rp(hargaAsliTerjual)}</div></div>
-      <div class="stat-card"><div class="stat-label">Pengeluaran Manual</div><div class="stat-value" style="color:var(--red)">${rp(pengeluaranManual)}</div></div>
-      <div class="stat-card"><div class="stat-label">Pemasukan Manual</div><div class="stat-value" style="color:var(--green)">${rp(pemasukanManual)}</div></div>
-      <div class="stat-card"><div class="stat-label">Total Gratis</div><div class="stat-value" style="color:var(--yellow)">${rp(totalGratis)}</div></div>
-      <div class="stat-card"><div class="stat-label">Total Bayar</div><div class="stat-value" style="color:var(--green)">${rp(totalBayar)}</div></div>
+    </div>
+    <div style="display:flex;gap:10px;margin-bottom:10px;">
+      <div style="flex:1;display:flex;flex-direction:column;gap:10px;">
+        <div class="stat-card"><div class="stat-label">Total Bayar</div><div class="stat-value" style="color:var(--green)">${rp(totalBayar)}</div></div>
+        <div class="stat-card"><div class="stat-label">Pemasukan Manual</div><div class="stat-value" style="color:var(--green)">${rp(pemasukanManual)}</div></div>
+      </div>
+      <div style="flex:1;display:flex;flex-direction:column;gap:10px;">
+        <div class="stat-card"><div class="stat-label">Modal Terjual</div><div class="stat-value" style="color:var(--red)">${rp(hargaAsliTerjual)}</div></div>
+        <div class="stat-card"><div class="stat-label">Total Gratis</div><div class="stat-value" style="color:var(--yellow)">${rp(totalGratis)}</div></div>
+        <div class="stat-card"><div class="stat-label">Pengeluaran Manual</div><div class="stat-value" style="color:var(--red)">${rp(pengeluaranManual)}</div></div>
+      </div>
+    </div>
+    <div class="stat-grid">
       <div class="stat-card full"><div class="stat-label">Penghasilan Bersih</div><div class="stat-value" style="color:${bersih>=0?'#6ddc6d':'#ff7c7c'};font-size:22px;">${rp(bersih)}</div></div>
     </div>`;
+
+  const renderManualItem = (m, color) => `
+    <div class="card" style="margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;">
+      <div>
+        <div style="font-size:13px;font-weight:600;">${m.desc}</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span style="font-size:14px;font-weight:800;color:${color};">${rp(m.amount)}</span>
+        <button class="btn btn-sm btn-edit" onclick="editModal('${m.id}')">Edit</button>
+        <button class="btn btn-sm btn-delete" onclick="deleteModal('${m.id}')">Hapus</button>
+      </div>
+    </div>`;
+
+  const pemasukanList = state.modals.filter(m => m.date === date && m.type === 'masuk');
+  document.getElementById('harian-pemasukan-list').innerHTML = pemasukanList.length === 0
+    ? '<div style="font-size:12px;color:var(--gray);margin-bottom:12px;">Belum ada pemasukan manual hari ini.</div>'
+    : pemasukanList.map(m => renderManualItem(m, 'var(--green)')).join('');
+
+  const pengeluaranList = state.modals.filter(m => m.date === date && (m.type||'keluar') === 'keluar');
+  document.getElementById('harian-pengeluaran-list').innerHTML = pengeluaranList.length === 0
+    ? '<div style="font-size:12px;color:var(--gray);margin-bottom:12px;">Belum ada pengeluaran manual hari ini.</div>'
+    : pengeluaranList.map(m => renderManualItem(m, 'var(--red)')).join('');
 
   if (orders.length === 0) {
     document.getElementById('harian-list').innerHTML = '<div class="empty"><div class="empty-icon">📋</div>Belum ada order hari ini.</div>';
@@ -866,24 +900,10 @@ function renderHarian() {
 }
 
 function renderOrderModalLists() {
-  const date = todayStr();
-  const renderItem = (m, color) => `
-    <div class="card" style="margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;">
-      <div>
-        <div style="font-size:13px;font-weight:600;">${m.desc}</div>
-        <div style="font-size:11px;color:var(--gray);">${m.type === 'masuk' ? 'Pemasukan manual' : 'Pengeluaran manual'}</div>
-      </div>
-      <div style="display:flex;align-items:center;gap:8px;">
-        <span style="font-size:14px;font-weight:800;color:${color};">${m.type === 'masuk' ? '+' : '-'} ${rp(m.amount)}</span>
-        <button class="btn btn-sm btn-delete" onclick="deleteOrderModal('${m.id}')">Hapus</button>
-      </div>
-    </div>`;
-
-  const pengeluaranHariIni = state.modals.filter(m => m.date === date && (m.type||'keluar') === 'keluar');
-  document.getElementById('order-pengeluaran-list').innerHTML = pengeluaranHariIni.map(m => renderItem(m, 'var(--red)')).join('');
-
-  const pemasukanHariIni = state.modals.filter(m => m.date === date && m.type === 'masuk');
-  document.getElementById('order-pemasukan-list').innerHTML = pemasukanHariIni.map(m => renderItem(m, 'var(--green)')).join('');
+  // Detail list pemasukan/pengeluaran manual sudah tidak ditampilkan di halaman Order
+  // (lihat halaman Rekap Harian untuk detailnya). Fungsi ini sengaja dikosongkan
+  // supaya panggilan lama (submit/edit/delete) tetap aman tanpa perlu diubah semua.
+  return;
 }
 
 function submitOrderPengeluaran() {
@@ -1520,6 +1540,7 @@ function submitModal() {
 function editModal(id) {
   const m = state.modals.find(x => x.id === id);
   if (!m) return;
+  document.getElementById('edit-modal-title').textContent = m.type === 'masuk' ? 'Edit Pemasukan' : 'Edit Pengeluaran';
   document.getElementById('edit-modal-id').value = id;
   document.getElementById('edit-modal-date').value = m.date;
   document.getElementById('edit-modal-desc').value = m.desc;
@@ -1539,13 +1560,17 @@ function saveEditModal() {
   saveState();
   closeModal('modal-edit-modal');
   renderModal();
-  toast('Pengeluaran diperbarui!');
+  renderHarian();
+  renderOrderModalLists();
+  toast('Data diperbarui!');
 }
 function deleteModal(id) {
-  if (!confirm('Hapus pengeluaran ini?')) return;
+  if (!confirm('Hapus catatan ini?')) return;
   state.modals = state.modals.filter(x => x.id !== id);
   saveState();
   renderModal();
+  renderHarian();
+  renderOrderModalLists();
   toast('Dihapus.');
 }
 
@@ -1759,7 +1784,6 @@ async function exportData() {
 
     await Share.share({
       title: 'Export Data Catatan Jualan',
-      text: 'Backup data Catatan Jualan',
       url: result.uri,
       dialogTitle: 'Simpan atau bagikan file backup'
     });
