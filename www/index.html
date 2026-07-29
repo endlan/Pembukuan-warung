@@ -1252,6 +1252,36 @@ function getTerjualSince(ids, sinceRaw) {
   return total;
 }
 
+// ===== STOK UNDO =====
+let stokUndoSnapshot = null;
+function saveStokUndoSnapshot() {
+  stokUndoSnapshot = JSON.parse(JSON.stringify(state.stocks));
+}
+function undoStok() {
+  if (!stokUndoSnapshot) return;
+  state.stocks = stokUndoSnapshot;
+  stokUndoSnapshot = null;
+  saveState();
+  renderStok(false);
+  toast('↩️ Perubahan stok dibatalkan.');
+}
+function refreshBaselineStok() {
+  if (!confirm('Refresh baseline? Angka "Terjual" akan dihitung ulang dari sekarang, jumlah stok tidak berubah.')) return;
+  saveStokUndoSnapshot();
+  const groups = getToppingGroups().filter(g => {
+    const def = findToppingDefById(g.ids[0]);
+    return !(def && def.components && def.components.length > 0);
+  });
+  groups.forEach(g => {
+    const canonicalId = g.ids[0];
+    if (!state.stocks[canonicalId]) state.stocks[canonicalId] = { total: 0, baselineDate: null, riwayat: [] };
+    state.stocks[canonicalId].baselineDate = Date.now();
+  });
+  saveState();
+  renderStok(false);
+  toast('🔄 Baseline berhasil di-refresh!');
+}
+
 function renderStok(editMode = false) {
   const groups = getToppingGroups();
   if (groups.length === 0) {
@@ -1265,7 +1295,9 @@ function renderStok(editMode = false) {
         ? `<button class="btn btn-primary" onclick="simpanEditStok()">💾 Simpan</button>
            <button class="btn btn-outline" style="margin-left:6px;" onclick="renderStok(false)">Batal</button>`
         : `<button class="btn btn-primary" onclick="openEditStokSemua()">📦 Restock</button>
-           <button class="btn btn-outline" style="margin-left:6px;" onclick="renderStok(true)">✏️ Edit Stok</button>`
+           <button class="btn btn-outline" style="margin-left:6px;" onclick="renderStok(true)">✏️ Edit Stok</button>
+           <button class="btn btn-outline" style="margin-left:6px;" onclick="refreshBaselineStok()">🔄 Refresh Baseline</button>
+           ${stokUndoSnapshot ? `<button class="btn btn-outline" style="margin-left:6px;" onclick="undoStok()">↩️ Undo</button>` : ''}`
       }
     </div>
     ${menus.map(m => {
@@ -1332,6 +1364,7 @@ function renderStok(editMode = false) {
 }
 
 function simpanEditStok() {
+  saveStokUndoSnapshot();
   const groups = getToppingGroups();
   groups.forEach(g => {
     const canonicalId = g.ids[0];
@@ -1381,6 +1414,7 @@ function openEditStokSemua() {
 }
 
 function submitEditStokSemua() {
+  saveStokUndoSnapshot();
   const groups = getToppingGroups();
   let ada = false;
   groups.forEach(g => {
