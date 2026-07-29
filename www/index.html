@@ -772,6 +772,7 @@ function submitOrder() {
     id: uid(),
     date: todayStr(),
     time: new Date().toLocaleTimeString('id-ID', { hour:'2-digit', minute:'2-digit' }),
+    createdAt: Date.now(),
     items,
     status: currentPayStatus,
     note,
@@ -1218,10 +1219,21 @@ function findToppingDefById(id) {
   return null;
 }
 
-function getTerjualSince(ids, sinceDate) {
+function toTs(v) {
+  if (v == null) return null;
+  if (typeof v === 'number') return v;
+  const t = new Date(v).getTime();
+  return isNaN(t) ? null : t;
+}
+
+function getTerjualSince(ids, sinceRaw) {
+  const sinceTs = toTs(sinceRaw);
   let total = 0;
   state.orders.forEach(o => {
-    if (sinceDate && o.date < sinceDate) return;
+    if (sinceTs != null) {
+      const orderTs = o.createdAt != null ? o.createdAt : toTs(o.date);
+      if (orderTs != null && orderTs < sinceTs) return;
+    }
     o.items.forEach(item => {
       item.toppings.forEach(t => {
         if (ids.includes(t.id)) {
@@ -1328,7 +1340,7 @@ function simpanEditStok() {
     const val = parseInt(input.value) || 0;
     if (!state.stocks[canonicalId]) state.stocks[canonicalId] = { total: 0, baselineDate: null, riwayat: [] };
     state.stocks[canonicalId].total = val;
-    state.stocks[canonicalId].baselineDate = todayStr();
+    state.stocks[canonicalId].baselineDate = Date.now();
     // Keep other ids sharing this name in sync at 0 so totals never double-count.
     g.ids.slice(1).forEach(otherId => {
       if (!state.stocks[otherId]) state.stocks[otherId] = { total: 0, baselineDate: null, riwayat: [] };
@@ -1382,7 +1394,7 @@ function submitEditStokSemua() {
       const terjualSejakBaseline = getTerjualSince(g.ids, stokData.baselineDate);
       const sisaSekarang = stokData.total - terjualSejakBaseline;
       stokData.total = sisaSekarang + val;
-      stokData.baselineDate = todayStr();
+      stokData.baselineDate = Date.now();
       stokData.riwayat.push({ date: todayStr(), jumlah: val, catatan: '' });
       ada = true;
     }
