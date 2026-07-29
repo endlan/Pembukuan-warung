@@ -1266,7 +1266,7 @@ function undoStok() {
   toast('↩️ Perubahan stok dibatalkan.');
 }
 function refreshBaselineStok() {
-  if (!confirm('Refresh baseline? Angka "Terjual" akan dihitung ulang dari sekarang, jumlah stok tidak berubah.')) return;
+  if (!confirm('Refresh baseline? Stok akan disesuaikan ke sisa saat ini, dan "Terjual" mulai dihitung ulang dari 0.')) return;
   saveStokUndoSnapshot();
   const groups = getToppingGroups().filter(g => {
     const def = findToppingDefById(g.ids[0]);
@@ -1275,7 +1275,11 @@ function refreshBaselineStok() {
   groups.forEach(g => {
     const canonicalId = g.ids[0];
     if (!state.stocks[canonicalId]) state.stocks[canonicalId] = { total: 0, baselineDate: null, riwayat: [] };
-    state.stocks[canonicalId].baselineDate = Date.now();
+    const stokData = state.stocks[canonicalId];
+    const terjual = getTerjualSince(g.ids, stokData.baselineDate);
+    const sisa = stokData.total - terjual;
+    stokData.total = sisa;
+    stokData.baselineDate = Date.now();
   });
   saveState();
   renderStok(false);
