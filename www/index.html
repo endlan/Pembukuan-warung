@@ -220,6 +220,9 @@
   .input-row { display:flex; gap:8px; }
   .input-row .form-group { flex:1; }
 </style>
+  <script src="https://cdn.jsdelivr.net/npm/@capacitor/core@6/dist/capacitor.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@capacitor/filesystem@6/dist/plugin.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@capacitor/share@6/dist/plugin.js"></script>
 </head>
 <body>
 
@@ -246,36 +249,37 @@
     </div>
     <button class="btn btn-accent" onclick="submitOrder()">✓ Selesai — Simpan Order</button>
 
-    <div style="border-top:1px solid #eee;margin-top:20px;padding-top:14px;">
-      <div style="display:flex;justify-content:space-between;align-items:center;cursor:pointer;" onclick="toggleCatatanLain()">
-        <div class="section-title" style="margin:0;">Catatan Lain (opsional)</div>
-        <span id="catatan-lain-arrow" style="font-size:12px;color:var(--gray);">▲</span>
-      </div>
-      <div id="catatan-lain-box" style="display:block;margin-top:10px;">
-        <div class="card" style="margin-bottom:10px;">
-          <div class="form-group">
-            <label class="form-label">💰 Pemasukan Manual — Keterangan</label>
-            <input type="text" class="form-input" id="order-pemasukan-desc" placeholder="Misal: Jual sambal">
-          </div>
-          <div class="form-group">
-            <label class="form-label">Jumlah (Rp)</label>
-            <input type="number" class="form-input" id="order-pemasukan-amount" placeholder="0">
-          </div>
-          <button style="width:100%;padding:13px 20px;font-size:14px;border-radius:10px;border:none;background:var(--green);color:#fff;font-family:'Plus Jakarta Sans',sans-serif;font-weight:700;" onclick="submitOrderPemasukan()">💰 Catat Pemasukan</button>
+    <div class="section-title">💸 Pengeluaran Manual</div>
+    <div class="card" id="order-pengeluaran-form">
+      <div class="input-row">
+        <div class="form-group" style="flex:2">
+          <label class="form-label">Keterangan</label>
+          <input type="text" class="form-input" id="order-pengeluaran-desc" placeholder="Misal: Pengamen, sumbangan...">
         </div>
-        <div class="card">
-          <div class="form-group">
-            <label class="form-label">💸 Pengeluaran Manual — Keterangan</label>
-            <input type="text" class="form-input" id="order-pengeluaran-desc" placeholder="Misal: Belanja bahan">
-          </div>
-          <div class="form-group">
-            <label class="form-label">Jumlah (Rp)</label>
-            <input type="number" class="form-input" id="order-pengeluaran-amount" placeholder="0">
-          </div>
-          <button style="width:100%;padding:13px 20px;font-size:14px;border-radius:10px;border:none;background:var(--red);color:#fff;font-family:'Plus Jakarta Sans',sans-serif;font-weight:700;" onclick="submitOrderPengeluaran()">💸 Catat Pengeluaran</button>
+        <div class="form-group" style="flex:1">
+          <label class="form-label">Jumlah (Rp)</label>
+          <input type="number" class="form-input" id="order-pengeluaran-amount" placeholder="0">
         </div>
       </div>
+      <button class="btn btn-primary" onclick="submitOrderPengeluaran()">+ Catat Pengeluaran</button>
     </div>
+    <div id="order-pengeluaran-list"></div>
+
+    <div class="section-title">💰 Pemasukan Manual</div>
+    <div class="card" id="order-pemasukan-form">
+      <div class="input-row">
+        <div class="form-group" style="flex:2">
+          <label class="form-label">Keterangan</label>
+          <input type="text" class="form-input" id="order-pemasukan-desc" placeholder="Misal: Modal tambahan, jual barang bekas...">
+        </div>
+        <div class="form-group" style="flex:1">
+          <label class="form-label">Jumlah (Rp)</label>
+          <input type="number" class="form-input" id="order-pemasukan-amount" placeholder="0">
+        </div>
+      </div>
+      <button class="btn btn-primary" onclick="submitOrderPemasukan()">+ Catat Pemasukan</button>
+    </div>
+    <div id="order-pemasukan-list"></div>
   </div>
 </div>
 
@@ -288,22 +292,8 @@
     </div>
   </div>
   <div class="scroll-content">
-    <div class="input-row" style="margin-bottom:16px;">
-      <div class="form-group" style="flex:2">
-        <label class="form-label">Tanggal</label>
-        <input type="date" class="form-input" id="filter-date" onchange="renderHarian()">
-      </div>
-      <div class="form-group" style="flex:1;justify-content:flex-end;display:flex;">
-        <button class="btn btn-sm btn-edit" onclick="goToHarianToday()" style="width:100%;">📅 Hari Ini</button>
-      </div>
-    </div>
+    <input type="hidden" id="filter-date">
     <div id="harian-stats"></div>
-
-    <div class="section-title">Pemasukan Manual</div>
-    <div id="harian-pemasukan-list"></div>
-
-    <div class="section-title">Pengeluaran Manual</div>
-    <div id="harian-pengeluaran-list"></div>
 
     <div class="section-title">Detail Order</div>
     <div id="harian-list"></div>
@@ -382,7 +372,7 @@
         <button class="btn btn-green btn-sm" style="flex:1;padding:12px;" onclick="exportData()">📤 Export Data</button>
         <button class="btn btn-edit btn-sm" style="flex:1;padding:12px;" onclick="document.getElementById('import-file').click()">📥 Import Data</button>
       </div>
-      <input type="file" id="import-file" accept="*/*" style="display:none" onchange="importData(event)">
+      <input type="file" id="import-file" accept=".json" style="display:none" onchange="importData(event)">
     </div>
   </div>
 </div>
@@ -393,7 +383,7 @@
     <span class="nav-icon">🛒</span>
     <span class="nav-label">Order</span>
   </button>
-  <button class="nav-btn" onclick="document.getElementById('filter-date').value=todayStr();showPage('page-harian')" data-page="page-harian">
+  <button class="nav-btn" onclick="showPage('page-harian')" data-page="page-harian">
     <span class="nav-icon">📅</span>
     <span class="nav-label">Harian</span>
   </button>
@@ -544,28 +534,6 @@
   </div>
 </div>
 
-<!-- Modal Edit Pemasukan Manual -->
-<div class="modal-overlay" id="modal-edit-pemasukan">
-  <div class="modal">
-    <div class="modal-title">Edit Pemasukan</div>
-    <div class="form-group">
-      <label class="form-label">Tanggal</label>
-      <input type="date" class="form-input" id="edit-pemasukan-date">
-    </div>
-    <div class="form-group">
-      <label class="form-label">Keterangan</label>
-      <input type="text" class="form-input" id="edit-pemasukan-desc">
-    </div>
-    <div class="form-group">
-      <label class="form-label">Jumlah (Rp)</label>
-      <input type="number" class="form-input" id="edit-pemasukan-amount">
-    </div>
-    <input type="hidden" id="edit-pemasukan-id">
-    <button class="btn btn-primary" onclick="saveEditPemasukan()">Simpan</button>
-    <button class="btn btn-outline" style="margin-top:8px;" onclick="closeModal('modal-edit-pemasukan')">Batal</button>
-  </div>
-</div>
-
 <!-- Modal Edit Stok Semua -->
 <div class="modal-overlay" id="modal-edit-stok-semua">
   <div class="modal-box">
@@ -588,8 +556,6 @@
   </div>
 </div>
 
-<script src="capacitor-plugins/filesystem.js"></script>
-<script src="capacitor-plugins/share.js"></script>
 <script>
 // ===== STATE =====
 const MONTHS = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
@@ -618,7 +584,6 @@ function loadState() {
   if (!state.toppings) state.toppings = [];
   if (!state.orders) state.orders = [];
   if (!state.modals) state.modals = [];
-  if (!state.pemasukanManual) state.pemasukanManual = [];
   if (!state.stocks) state.stocks = {};
   saveState();
 }
@@ -642,19 +607,9 @@ function fmtDateShort(str) {
   const d = new Date(str);
   return d.toLocaleDateString('id-ID', { day:'numeric', month:'short' });
 }
-function todayStr() {
-  const d = new Date();
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
-}
+function todayStr() { return new Date().toISOString().slice(0,10); }
 
 // ===== NAVIGATION =====
-  function goToHarianToday() {
-  document.getElementById('filter-date').value = todayStr();
-  renderHarian();
-}
 function showPage(pageId) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.getElementById(pageId).classList.add('active');
@@ -686,6 +641,7 @@ function closeModal(id) { document.getElementById(id).classList.remove('show'); 
 
 // ===== ORDER PAGE =====
 function renderOrderMenuList() {
+  renderOrderModalLists();
   const el = document.getElementById('order-menu-list');
   if (state.menus.length === 0) {
     el.innerHTML = '<div class="empty"><div class="empty-icon">🍽️</div>Belum ada menu. Tambah menu dulu di ⚙️ Menu.</div>';
@@ -839,63 +795,25 @@ function renderHarian() {
   const orders = state.orders.filter(o => o.date === date);
 
   // Stats
-  const ordersBayar = orders.filter(o => o.status === 'bayar');
-  const ordersGratis = orders.filter(o => o.status === 'gratis');
-  const totalBayar = ordersBayar.reduce((s, o) => s + o.grandTotal, 0);
-  const totalGratis = ordersGratis.reduce((s, o) => s + o.grandTotal, 0);
-  const modalManual = state.modals.filter(m => m.date === date).reduce((s, m) => s + m.amount, 0);
-  const pemasukanManualTotal = state.pemasukanManual.filter(m => m.date === date).reduce((s, m) => s + m.amount, 0);
-  const totalPenjualan = totalBayar + totalGratis + pemasukanManualTotal;
+  const totalBayar = orders.filter(o => o.status === 'bayar').reduce((s, o) => s + o.grandTotal, 0);
+  const totalGratis = orders.filter(o => o.status === 'gratis').reduce((s, o) => s + o.grandTotal, 0);
+  const totalPenjualan = totalBayar + totalGratis;
   const hargaAsliTerjual = orders.reduce((s, o) => s + (o.grandAsli||0), 0);
-  const totalDikurang = hargaAsliTerjual + modalManual;
-  const bersih = totalBayar + pemasukanManualTotal - totalDikurang;
+  const pengeluaranManual = state.modals.filter(m => m.date === date && (m.type||'keluar') === 'keluar').reduce((s, m) => s + m.amount, 0);
+  const pemasukanManual = state.modals.filter(m => m.date === date && m.type === 'masuk').reduce((s, m) => s + m.amount, 0);
+  const totalDikurang = hargaAsliTerjual + pengeluaranManual;
+  const bersih = totalBayar + pemasukanManual - totalDikurang;
 
   document.getElementById('harian-stats').innerHTML = `
     <div class="stat-grid">
-      <div class="stat-card full"><div class="stat-label">Total Penjualan <span style="font-size:10px;color:var(--gray);font-weight:400;">(termasuk gratis ${rp(totalGratis)} & pemasukan manual ${rp(pemasukanManualTotal)})</span></div><div class="stat-value" style="color:var(--green)">${rp(totalPenjualan)}</div></div>
+      <div class="stat-card full"><div class="stat-label">Total Penjualan <span style="font-size:10px;color:var(--gray);font-weight:400;">(termasuk gratis ${rp(totalGratis)})</span></div><div class="stat-value" style="color:var(--green)">${rp(totalPenjualan)}</div></div>
       <div class="stat-card"><div class="stat-label">Modal Terjual</div><div class="stat-value" style="color:var(--red)">${rp(hargaAsliTerjual)}</div></div>
-      <div class="stat-card"><div class="stat-label">Total Gratis</div><div class="stat-value" style="color:#e0a020">${rp(totalGratis)}</div></div>
-      <div class="stat-card"><div class="stat-label">Pengeluaran Manual</div><div class="stat-value" style="color:var(--red)">${rp(modalManual)}</div></div>
-      <div class="stat-card"><div class="stat-label">Pemasukan Manual</div><div class="stat-value" style="color:var(--green)">${rp(pemasukanManualTotal)}</div></div>
+      <div class="stat-card"><div class="stat-label">Pengeluaran Manual</div><div class="stat-value" style="color:var(--red)">${rp(pengeluaranManual)}</div></div>
+      <div class="stat-card"><div class="stat-label">Pemasukan Manual</div><div class="stat-value" style="color:var(--green)">${rp(pemasukanManual)}</div></div>
+      <div class="stat-card"><div class="stat-label">Total Gratis</div><div class="stat-value" style="color:var(--yellow)">${rp(totalGratis)}</div></div>
       <div class="stat-card"><div class="stat-label">Total Bayar</div><div class="stat-value" style="color:var(--green)">${rp(totalBayar)}</div></div>
       <div class="stat-card full"><div class="stat-label">Penghasilan Bersih</div><div class="stat-value" style="color:${bersih>=0?'#6ddc6d':'#ff7c7c'};font-size:22px;">${rp(bersih)}</div></div>
     </div>`;
-
-  // Render list pemasukan manual hari ini
-  const pemasukanHarian = state.pemasukanManual.filter(m => m.date === date);
-  document.getElementById('harian-pemasukan-list').innerHTML = pemasukanHarian.length === 0 ? '' : pemasukanHarian.map(m => `
-    <div class="card" style="margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;">
-      <div>
-        <div style="font-size:13px;font-weight:600;">${m.desc}</div>
-        <div style="font-size:11px;color:var(--gray);">Pemasukan manual</div>
-      </div>
-      <div style="display:flex;align-items:center;gap:8px;">
-        <span style="font-size:14px;font-weight:800;color:var(--green);">${rp(m.amount)}</span>
-        <button class="btn btn-sm btn-edit" onclick="editHarianPemasukan('${m.id}')">Edit</button>
-        <button class="btn btn-sm btn-delete" onclick="deleteHarianPemasukan('${m.id}')">Hapus</button>
-      </div>
-    </div>
-  `).join('');
-
-  // Render list pengeluaran manual hari ini
-  const pengeluaranHarian = state.modals.filter(m => m.date === date);
-  if (pengeluaranHarian.length === 0) {
-    document.getElementById('harian-pengeluaran-list').innerHTML = '';
-  } else {
-    document.getElementById('harian-pengeluaran-list').innerHTML = pengeluaranHarian.map(m => `
-      <div class="card" style="margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;">
-        <div>
-          <div style="font-size:13px;font-weight:600;">${m.desc}</div>
-          <div style="font-size:11px;color:var(--gray);">Pengeluaran manual</div>
-        </div>
-        <div style="display:flex;align-items:center;gap:8px;">
-          <span style="font-size:14px;font-weight:800;color:var(--red);">${rp(m.amount)}</span>
-          <button class="btn btn-sm btn-edit" onclick="editModal('${m.id}')">Edit</button>
-          <button class="btn btn-sm btn-delete" onclick="deleteHarianPengeluaran('${m.id}')">Hapus</button>
-        </div>
-      </div>
-    `).join('');
-  }
 
   if (orders.length === 0) {
     document.getElementById('harian-list').innerHTML = '<div class="empty"><div class="empty-icon">📋</div>Belum ada order hari ini.</div>';
@@ -946,24 +864,25 @@ function renderHarian() {
   `;
 }
 
-function toggleCatatanLain() {
-  const box = document.getElementById('catatan-lain-box');
-  const arrow = document.getElementById('catatan-lain-arrow');
-  const open = box.style.display === 'block';
-  box.style.display = open ? 'none' : 'block';
-  arrow.textContent = open ? '▼' : '▲';
-}
+function renderOrderModalLists() {
+  const date = todayStr();
+  const renderItem = (m, color) => `
+    <div class="card" style="margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;">
+      <div>
+        <div style="font-size:13px;font-weight:600;">${m.desc}</div>
+        <div style="font-size:11px;color:var(--gray);">${m.type === 'masuk' ? 'Pemasukan manual' : 'Pengeluaran manual'}</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span style="font-size:14px;font-weight:800;color:${color};">${m.type === 'masuk' ? '+' : '-'} ${rp(m.amount)}</span>
+        <button class="btn btn-sm btn-delete" onclick="deleteOrderModal('${m.id}')">Hapus</button>
+      </div>
+    </div>`;
 
-function submitOrderPemasukan() {
-  const desc = document.getElementById('order-pemasukan-desc').value.trim();
-  const amount = parseFloat(document.getElementById('order-pemasukan-amount').value);
-  if (!desc) { toast('Isi keterangan dulu!'); return; }
-  if (!amount || amount <= 0) { toast('Isi jumlah yang valid!'); return; }
-  state.pemasukanManual.push({ id: uid(), date: todayStr(), desc, amount });
-  saveState();
-  document.getElementById('order-pemasukan-desc').value = '';
-  document.getElementById('order-pemasukan-amount').value = '';
-  toast('✅ Pemasukan dicatat!');
+  const pengeluaranHariIni = state.modals.filter(m => m.date === date && (m.type||'keluar') === 'keluar');
+  document.getElementById('order-pengeluaran-list').innerHTML = pengeluaranHariIni.map(m => renderItem(m, 'var(--red)')).join('');
+
+  const pemasukanHariIni = state.modals.filter(m => m.date === date && m.type === 'masuk');
+  document.getElementById('order-pemasukan-list').innerHTML = pemasukanHariIni.map(m => renderItem(m, 'var(--green)')).join('');
 }
 
 function submitOrderPengeluaran() {
@@ -971,70 +890,33 @@ function submitOrderPengeluaran() {
   const amount = parseFloat(document.getElementById('order-pengeluaran-amount').value);
   if (!desc) { toast('Isi keterangan dulu!'); return; }
   if (!amount || amount <= 0) { toast('Isi jumlah yang valid!'); return; }
-  state.modals.push({ id: uid(), date: todayStr(), desc, amount });
+  state.modals.push({ id: uid(), date: todayStr(), desc, amount, type: 'keluar' });
   saveState();
   document.getElementById('order-pengeluaran-desc').value = '';
   document.getElementById('order-pengeluaran-amount').value = '';
+  renderOrderModalLists();
   toast('✅ Pengeluaran dicatat!');
 }
 
-function deleteHarianPemasukan(id) {
-  if (!confirm('Hapus pemasukan ini?')) return;
-  state.pemasukanManual = state.pemasukanManual.filter(x => x.id !== id);
-  saveState();
-  renderHarian();
-  toast('Pemasukan dihapus.');
-}
-
-function editHarianPemasukan(id) {
-  const m = state.pemasukanManual.find(x => x.id === id);
-  if (!m) return;
-  document.getElementById('edit-pemasukan-id').value = id;
-  document.getElementById('edit-pemasukan-date').value = m.date;
-  document.getElementById('edit-pemasukan-desc').value = m.desc;
-  document.getElementById('edit-pemasukan-amount').value = m.amount;
-  openModal('modal-edit-pemasukan');
-}
-function saveEditPemasukan() {
-  const id = document.getElementById('edit-pemasukan-id').value;
-  const idx = state.pemasukanManual.findIndex(x => x.id === id);
-  if (idx < 0) return;
-  const desc = document.getElementById('edit-pemasukan-desc').value.trim();
-  const amount = parseFloat(document.getElementById('edit-pemasukan-amount').value);
+function submitOrderPemasukan() {
+  const desc = document.getElementById('order-pemasukan-desc').value.trim();
+  const amount = parseFloat(document.getElementById('order-pemasukan-amount').value);
   if (!desc) { toast('Isi keterangan dulu!'); return; }
   if (!amount || amount <= 0) { toast('Isi jumlah yang valid!'); return; }
-  state.pemasukanManual[idx] = {
-    ...state.pemasukanManual[idx],
-    date: document.getElementById('edit-pemasukan-date').value,
-    desc,
-    amount,
-  };
+  state.modals.push({ id: uid(), date: todayStr(), desc, amount, type: 'masuk' });
   saveState();
-  closeModal('modal-edit-pemasukan');
-  renderHarian();
-  toast('Pemasukan diperbarui!');
+  document.getElementById('order-pemasukan-desc').value = '';
+  document.getElementById('order-pemasukan-amount').value = '';
+  renderOrderModalLists();
+  toast('✅ Pemasukan dicatat!');
 }
 
-function submitHarianPengeluaran() {
-  const date = document.getElementById('filter-date').value || todayStr();
-  const desc = document.getElementById('harian-pengeluaran-desc').value.trim();
-  const amount = parseFloat(document.getElementById('harian-pengeluaran-amount').value);
-  if (!desc) { toast('Isi keterangan dulu!'); return; }
-  if (!amount || amount <= 0) { toast('Isi jumlah yang valid!'); return; }
-  state.modals.push({ id: uid(), date, desc, amount });
-  saveState();
-  document.getElementById('harian-pengeluaran-desc').value = '';
-  document.getElementById('harian-pengeluaran-amount').value = '';
-  renderHarian();
-  toast('✅ Pengeluaran dicatat!');
-}
-
-function deleteHarianPengeluaran(id) {
-  if (!confirm('Hapus pengeluaran ini?')) return;
+function deleteOrderModal(id) {
+  if (!confirm('Hapus catatan ini?')) return;
   state.modals = state.modals.filter(x => x.id !== id);
   saveState();
-  renderHarian();
-  toast('Pengeluaran dihapus.');
+  renderOrderModalLists();
+  toast('Catatan dihapus.');
 }
 
 function editOrder(id) {
@@ -1103,41 +985,34 @@ function renderBulanan() {
   const totalPenjualan = orders.filter(o => o.status==='bayar').reduce((s,o) => s+o.grandTotal, 0);
   const totalGratis = orders.filter(o => o.status==='gratis').reduce((s,o) => s+o.grandTotal, 0);
   const hargaAsliTerjual = orders.reduce((s,o) => s+(o.grandAsli||0), 0);
-  const totalModalBelanja = state.modals.filter(m => {
+  const modalsBulanPenuh = state.modals.filter(m => {
     const d = new Date(m.date);
     return d.getMonth()===month && d.getFullYear()===year;
-  }).reduce((s,m) => s+m.amount, 0);
-  const allPemasukanBulan = state.pemasukanManual.filter(m => {
-    const d = new Date(m.date);
-    return d.getMonth() === month && d.getFullYear() === year;
   });
-  const pemasukanBulan = selectedDay ? allPemasukanBulan.filter(m => m.date === selectedDay) : allPemasukanBulan;
-  const totalPemasukanManual = pemasukanBulan.reduce((s,m) => s+m.amount, 0);
-  const totalDikurang = hargaAsliTerjual + totalModalBelanja;
+  const totalPengeluaranManual = modalsBulanPenuh.filter(m => (m.type||'keluar')==='keluar').reduce((s,m) => s+m.amount, 0);
+  const totalPemasukanManual = modalsBulanPenuh.filter(m => m.type==='masuk').reduce((s,m) => s+m.amount, 0);
+  const totalDikurang = hargaAsliTerjual + totalPengeluaranManual;
   const laba = totalPenjualan + totalPemasukanManual - totalDikurang;
 
   document.getElementById('bulanan-stats').innerHTML = `
     <div class="stat-grid">
       <div class="stat-card"><div class="stat-label">Total Penjualan</div><div class="stat-value" style="color:var(--green)">${rp(totalPenjualan)}</div></div>
-      <div class="stat-card"><div class="stat-label">Pemasukan Manual</div><div class="stat-value" style="color:var(--green)">${rp(totalPemasukanManual)}</div></div>
+      <div class="stat-card"><div class="stat-label">Total Gratis</div><div class="stat-value" style="color:var(--yellow)">${rp(totalGratis)}</div></div>
       <div class="stat-card"><div class="stat-label">Modal Terjual</div><div class="stat-value" style="color:var(--red)">${rp(hargaAsliTerjual)}</div></div>
-      <div class="stat-card"><div class="stat-label">Pengeluaran Manual</div><div class="stat-value" style="color:var(--red)">${rp(totalModalBelanja)}</div></div>
+      <div class="stat-card"><div class="stat-label">Pengeluaran Manual</div><div class="stat-value" style="color:var(--red)">${rp(totalPengeluaranManual)}</div></div>
+      <div class="stat-card"><div class="stat-label">Pemasukan Manual</div><div class="stat-value" style="color:var(--green)">${rp(totalPemasukanManual)}</div></div>
       <div class="stat-card full"><div class="stat-label">Penghasilan Bersih</div><div class="stat-value" style="color:${laba>=0?'#6ddc6d':'#ff7c7c'};font-size:22px;">${rp(laba)}</div></div>
     </div>`;
 
-  // Group by date (order, pengeluaran manual, pemasukan manual)
+  // Group by date (order & pengeluaran manual)
   const groups = {};
   orders.forEach(o => {
-    if (!groups[o.date]) groups[o.date] = { orders: [], modals: [], pemasukan: [] };
+    if (!groups[o.date]) groups[o.date] = { orders: [], modals: [] };
     groups[o.date].orders.push(o);
   });
   modalsBulan.forEach(m => {
-    if (!groups[m.date]) groups[m.date] = { orders: [], modals: [], pemasukan: [] };
+    if (!groups[m.date]) groups[m.date] = { orders: [], modals: [] };
     groups[m.date].modals.push(m);
-  });
-  pemasukanBulan.forEach(m => {
-    if (!groups[m.date]) groups[m.date] = { orders: [], modals: [], pemasukan: [] };
-    groups[m.date].pemasukan.push(m);
   });
   const sorted = Object.entries(groups).sort((a,b) => b[0].localeCompare(a[0]));
 
@@ -1149,16 +1024,17 @@ function renderBulanan() {
   document.getElementById('bulanan-list').innerHTML = sorted.map(([date, dayData]) => {
     const dayOrders = dayData.orders;
     const dayModals = dayData.modals;
-    const dayPemasukan = dayData.pemasukan || [];
-    const dayModalTotal = dayModals.reduce((s,m)=>s+m.amount,0);
-    const dayPemasukanTotal = dayPemasukan.reduce((s,m)=>s+m.amount,0);
+    const dayPengeluaranManual = dayModals.filter(m => (m.type||'keluar')==='keluar');
+    const dayPemasukanManual = dayModals.filter(m => m.type==='masuk');
+    const dayPengeluaranTotal = dayPengeluaranManual.reduce((s,m)=>s+m.amount,0);
+    const dayPemasukanTotal = dayPemasukanManual.reduce((s,m)=>s+m.amount,0);
     const dayBayarOrders = dayOrders.filter(o=>o.status==='bayar');
     const dayGratisOrders = dayOrders.filter(o=>o.status==='gratis');
     const dayTotal = dayBayarOrders.reduce((s,o)=>s+o.grandTotal,0);
     const dayGratis = dayGratisOrders.reduce((s,o)=>s+o.grandTotal,0);
     const dayModalTerjual = dayBayarOrders.reduce((s,o)=>s+(o.grandAsli||0),0);
     const dayModalGratis = dayGratisOrders.reduce((s,o)=>s+(o.grandAsli||0),0);
-    const dayLaba = dayTotal + dayPemasukanTotal - dayModalTerjual - dayModalGratis - dayModalTotal;
+    const dayLaba = dayTotal + dayPemasukanTotal - dayModalTerjual - dayModalGratis - dayPengeluaranTotal;
     const id = 'day-' + date.replace(/-/g,'');
     const detailId = 'detail-' + date.replace(/-/g,'');
 
@@ -1202,7 +1078,7 @@ function renderBulanan() {
       <div class="day-header" onclick="toggleDay('${id}')">
         <div>
           <div style="font-weight:700;font-size:14px;">${fmtDate(date)}</div>
-          <div style="font-size:11px;color:var(--gray);margin-top:2px;">${dayOrders.length} order · Gratis ${rp(dayGratis)}${dayModalTotal>0?` · Pengeluaran ${rp(dayModalTotal)}`:''}</div>
+          <div style="font-size:11px;color:var(--gray);margin-top:2px;">${dayOrders.length} order · Gratis ${rp(dayGratis)}${dayPengeluaranTotal>0?` · Pengeluaran ${rp(dayPengeluaranTotal)}`:''}${dayPemasukanTotal>0?` · Pemasukan ${rp(dayPemasukanTotal)}`:''}</div>
         </div>
         <div style="text-align:right;">
           <div style="font-size:11px;color:var(--gray);">${rp(dayTotal)}</div>
@@ -1216,11 +1092,11 @@ function renderBulanan() {
         <div style="border-top:1px solid var(--border,#e5e5e5);margin-top:6px;padding-top:6px;display:flex;justify-content:space-between;font-size:13px;font-weight:700;">
           <span>Penghasilan</span><span>${rp(dayTotal)}</span>
         </div>
-        ${dayPemasukanTotal>0?`<div style="display:flex;justify-content:space-between;font-size:13px;color:var(--green);padding:2px 0;"><span>Pemasukan manual</span><span>+ ${rp(dayPemasukanTotal)}</span></div>`:''}
         <div style="margin-top:6px;">
+          ${dayPemasukanTotal>0?`<div style="display:flex;justify-content:space-between;font-size:13px;color:var(--green);padding:2px 0;"><span>Pemasukan manual</span><span>+ ${rp(dayPemasukanTotal)}</span></div>`:''}
           ${dayModalTerjual>0?`<div style="display:flex;justify-content:space-between;font-size:13px;color:var(--red);padding:2px 0;"><span>Modal barang terjual</span><span>- ${rp(dayModalTerjual)}</span></div>`:''}
           ${dayModalGratis>0?`<div style="display:flex;justify-content:space-between;font-size:13px;color:var(--red);padding:2px 0;"><span>Modal barang gratis</span><span>- ${rp(dayModalGratis)}</span></div>`:''}
-          ${dayModalTotal>0?`<div style="display:flex;justify-content:space-between;font-size:13px;color:var(--red);padding:2px 0;"><span>Pengeluaran manual</span><span>- ${rp(dayModalTotal)}</span></div>`:''}
+          ${dayPengeluaranTotal>0?`<div style="display:flex;justify-content:space-between;font-size:13px;color:var(--red);padding:2px 0;"><span>Pengeluaran manual</span><span>- ${rp(dayPengeluaranTotal)}</span></div>`:''}
         </div>
         <div style="border-top:1px solid var(--border,#e5e5e5);margin-top:6px;padding-top:6px;display:flex;justify-content:space-between;font-size:14px;font-weight:800;">
           <span>Pendapatan bersih</span><span style="color:${dayLaba>=0?'var(--green)':'var(--red)'};">${rp(dayLaba)}</span>
@@ -1237,31 +1113,31 @@ function renderBulanan() {
             <div style="font-size:11px;font-weight:700;color:var(--yellow);margin-top:6px;margin-bottom:4px;letter-spacing:0.5px;">🎁 GRATIS (${dayGratisOrders.length} order)</div>
             ${dayGratisOrders.map(renderOrderItem).join('')}
           ` : ''}
-          ${dayPemasukan.length > 0 ? `
-            <div style="font-size:11px;font-weight:700;color:var(--green);margin-top:6px;margin-bottom:4px;letter-spacing:0.5px;">💰 PEMASUKAN MANUAL (${dayPemasukan.length})</div>
-            ${dayPemasukan.map(m => `
-              <div class="order-item" style="display:flex;justify-content:space-between;align-items:center;">
-                <div>
-                  <div style="font-size:13px;font-weight:600;">${m.desc}</div>
-                  <div style="font-size:11px;color:var(--gray);">Pemasukan manual</div>
-                </div>
-                <div style="display:flex;align-items:center;gap:8px;">
-                  <span style="font-size:13px;font-weight:700;color:var(--green);">${rp(m.amount)}</span>
-                  <button class="btn btn-sm btn-delete" onclick="deleteBulananPemasukan('${m.id}')">Hapus</button>
-                </div>
-              </div>
-            `).join('')}
-          ` : ''}
-          ${dayModals.length > 0 ? `
-            <div style="font-size:11px;font-weight:700;color:var(--red);margin-top:6px;margin-bottom:4px;letter-spacing:0.5px;">💸 PENGELUARAN MANUAL (${dayModals.length})</div>
-            ${dayModals.map(m => `
+          ${dayPengeluaranManual.length > 0 ? `
+            <div style="font-size:11px;font-weight:700;color:var(--red);margin-top:6px;margin-bottom:4px;letter-spacing:0.5px;">💸 PENGELUARAN MANUAL (${dayPengeluaranManual.length})</div>
+            ${dayPengeluaranManual.map(m => `
               <div class="order-item" style="display:flex;justify-content:space-between;align-items:center;">
                 <div>
                   <div style="font-size:13px;font-weight:600;">${m.desc}</div>
                   <div style="font-size:11px;color:var(--gray);">Pengeluaran manual</div>
                 </div>
                 <div style="display:flex;align-items:center;gap:8px;">
-                  <span style="font-size:13px;font-weight:700;color:var(--red);">${rp(m.amount)}</span>
+                  <span style="font-size:13px;font-weight:700;color:var(--red);">- ${rp(m.amount)}</span>
+                  <button class="btn btn-sm btn-delete" onclick="deleteBulananPengeluaran('${m.id}')">Hapus</button>
+                </div>
+              </div>
+            `).join('')}
+          ` : ''}
+          ${dayPemasukanManual.length > 0 ? `
+            <div style="font-size:11px;font-weight:700;color:var(--green);margin-top:6px;margin-bottom:4px;letter-spacing:0.5px;">💰 PEMASUKAN MANUAL (${dayPemasukanManual.length})</div>
+            ${dayPemasukanManual.map(m => `
+              <div class="order-item" style="display:flex;justify-content:space-between;align-items:center;">
+                <div>
+                  <div style="font-size:13px;font-weight:600;">${m.desc}</div>
+                  <div style="font-size:11px;color:var(--gray);">Pemasukan manual</div>
+                </div>
+                <div style="display:flex;align-items:center;gap:8px;">
+                  <span style="font-size:13px;font-weight:700;color:var(--green);">+ ${rp(m.amount)}</span>
                   <button class="btn btn-sm btn-delete" onclick="deleteBulananPengeluaran('${m.id}')">Hapus</button>
                 </div>
               </div>
@@ -1279,14 +1155,6 @@ function deleteBulananPengeluaran(id) {
   saveState();
   renderBulanan();
   toast('Pengeluaran dihapus.');
-}
-
-function deleteBulananPemasukan(id) {
-  if (!confirm('Hapus pemasukan ini?')) return;
-  state.pemasukanManual = state.pemasukanManual.filter(x => x.id !== id);
-  saveState();
-  renderBulanan();
-  toast('Pemasukan dihapus.');
 }
 
 function toggleDay(id) {
@@ -1350,9 +1218,11 @@ function findToppingDefById(id) {
   return null;
 }
 
-function getTerjualGroup(ids) {
+function getTerjualGroup(ids, todayOnly = false) {
   let total = 0;
+  const today = todayStr();
   state.orders.forEach(o => {
+    if (todayOnly && o.date !== today) return;
     o.items.forEach(item => {
       item.toppings.forEach(t => {
         if (ids.includes(t.id)) {
@@ -1387,74 +1257,59 @@ function renderStok(editMode = false) {
       }
     </div>
     ${menus.map(m => {
-      const menuGroups = sortByName(groups.filter(g => g.menuId === m.id && !isGroupComposite(g)));
+      const menuGroups = sortByName(groups.filter(g => g.menuId === m.id));
       return `
       <div style="margin-bottom:18px;">
         <div style="background:var(--dark);color:#fff;font-size:12px;font-weight:800;letter-spacing:1px;text-transform:uppercase;padding:8px 12px;border-radius:8px;margin-bottom:8px;">${m.name}</div>
         ${menuGroups.length === 0 ? '<div style="font-size:12px;color:var(--gray);margin-bottom:8px;">Belum ada topping/barang</div>' :
-          menuGroups.map(g => renderStokCard(g, editMode)).join('')}
+          menuGroups.map(g => {
+            const canonicalId = g.ids[0];
+            const def = findToppingDefById(canonicalId);
+            const isComposite = def && def.components && def.components.length > 0;
+
+            if (isComposite) {
+              const compLabel = def.components.map(c => {
+                const compDef = findToppingDefById(c.toppingId);
+                return `${compDef ? compDef.name : '?'} ×${c.qty}`;
+              }).join(', ');
+              return `
+              <div class="card" style="margin-bottom:8px;border-style:dashed;">
+                <div style="font-size:14px;font-weight:700;margin-bottom:4px;">${g.name}</div>
+                <div style="font-size:11px;color:var(--gray);">Pakai stok dari: ${compLabel}</div>
+              </div>`;
+            }
+
+            const stokData = state.stocks[canonicalId] || { total: 0, riwayat: [] };
+            const terjualHariIni = getTerjualGroup(g.ids, true);
+            const terjualTotal = getTerjualGroup(g.ids, false);
+            const sisa = stokData.total - terjualTotal;
+            const sisaColor = sisa <= 0 ? '#ff7c7c' : sisa <= 5 ? 'var(--yellow)' : 'var(--green)';
+            return `
+            <div class="card" style="margin-bottom:8px;">
+              <div style="font-size:14px;font-weight:700;margin-bottom:8px;">${g.name}</div>
+              <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;text-align:center;">
+                <div style="background:#f5f5f5;border-radius:8px;padding:8px;">
+                  <div style="font-size:10px;color:var(--gray);margin-bottom:4px;">STOK</div>
+                  ${editMode
+                    ? `<input type="number" id="stok-input-${canonicalId}" value="${stokData.total}" min="0"
+                         style="width:100%;border:2px solid var(--primary);border-radius:6px;padding:4px;font-size:16px;font-weight:800;text-align:center;background:#fff;">`
+                    : `<div style="font-size:16px;font-weight:800;">${stokData.total}</div>`
+                  }
+                </div>
+                <div style="background:#f5f5f5;border-radius:8px;padding:8px;">
+                  <div style="font-size:10px;color:var(--gray);margin-bottom:2px;">TERJUAL HARI INI</div>
+                  <div style="font-size:16px;font-weight:800;color:var(--red);">${terjualHariIni}</div>
+                </div>
+                <div style="background:#f5f5f5;border-radius:8px;padding:8px;">
+                  <div style="font-size:10px;color:var(--gray);margin-bottom:2px;">SISA</div>
+                  <div style="font-size:16px;font-weight:800;color:${sisaColor};">${sisa}</div>
+                </div>
+              </div>
+            </div>`;
+          }).join('')}
       </div>`;
     }).join('')}
-    ${(() => {
-      const compositeGroups = sortByName(groups.filter(g => isGroupComposite(g)));
-      if (compositeGroups.length === 0) return '';
-      return `
-      <div style="margin-bottom:18px;">
-        <div style="background:var(--gray);color:#fff;font-size:12px;font-weight:800;letter-spacing:1px;text-transform:uppercase;padding:8px 12px;border-radius:8px;margin-bottom:8px;">BARANG KOMPOSISI (nempel stok item lain)</div>
-        ${compositeGroups.map(g => renderStokCard(g, editMode)).join('')}
-      </div>`;
-    })()}
   `;
-}
-
-function isGroupComposite(g) {
-  const def = findToppingDefById(g.ids[0]);
-  return !!(def && def.components && def.components.length > 0);
-}
-
-function renderStokCard(g, editMode) {
-  const canonicalId = g.ids[0];
-  const def = findToppingDefById(canonicalId);
-  const isComposite = def && def.components && def.components.length > 0;
-
-  if (isComposite) {
-    const compLabel = def.components.map(c => {
-      const compDef = findToppingDefById(c.toppingId);
-      return `${compDef ? compDef.name : '?'} ×${c.qty}`;
-    }).join(', ');
-    return `
-    <div class="card" style="margin-bottom:8px;border-style:dashed;">
-      <div style="font-size:14px;font-weight:700;margin-bottom:4px;">${g.name}</div>
-      <div style="font-size:11px;color:var(--gray);">Pakai stok dari: ${compLabel}</div>
-    </div>`;
-  }
-
-  const stokData = state.stocks[canonicalId] || { total: 0, riwayat: [] };
-  const terjual = getTerjualGroup(g.ids);
-  const sisa = stokData.total - terjual;
-  const sisaColor = sisa <= 0 ? '#ff7c7c' : sisa <= 5 ? 'var(--yellow)' : 'var(--green)';
-  return `
-  <div class="card" style="margin-bottom:8px;">
-    <div style="font-size:14px;font-weight:700;margin-bottom:8px;">${g.name}</div>
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;text-align:center;">
-      <div style="background:#f5f5f5;border-radius:8px;padding:8px;">
-        <div style="font-size:10px;color:var(--gray);margin-bottom:4px;">STOK</div>
-        ${editMode
-          ? `<input type="number" id="stok-input-${canonicalId}" value="${stokData.total}" min="0"
-               style="width:100%;border:2px solid var(--primary);border-radius:6px;padding:4px;font-size:16px;font-weight:800;text-align:center;background:#fff;">`
-          : `<div style="font-size:16px;font-weight:800;">${stokData.total}</div>`
-        }
-      </div>
-      <div style="background:#f5f5f5;border-radius:8px;padding:8px;">
-        <div style="font-size:10px;color:var(--gray);margin-bottom:2px;">TERJUAL</div>
-        <div style="font-size:16px;font-weight:800;color:var(--red);">${terjual}</div>
-      </div>
-      <div style="background:#f5f5f5;border-radius:8px;padding:8px;">
-        <div style="font-size:10px;color:var(--gray);margin-bottom:2px;">SISA</div>
-        <div style="font-size:16px;font-weight:800;color:${sisaColor};">${sisa}</div>
-      </div>
-    </div>
-  </div>`;
 }
 
 function simpanEditStok() {
@@ -1517,19 +1372,14 @@ function renderModal() {
   const hargaAsliTerjual = allOrders.reduce((s,o) => s+(o.grandAsli||0), 0);
   const totalDikurang = totalModalManual + hargaAsliTerjual;
   const totalPenjualan = orders.reduce((s,o) => s+o.grandTotal, 0);
-  const pemasukanManualBulan = state.pemasukanManual.filter(m => {
-    const d = new Date(m.date);
-    return d.getMonth()===month && d.getFullYear()===year;
-  });
-  const totalPemasukanManual = pemasukanManualBulan.reduce((s,m) => s+m.amount, 0);
-  const laba = totalPenjualan + totalPemasukanManual - totalDikurang;
+  const laba = totalPenjualan - totalDikurang;
 
   document.getElementById('modal-summary').innerHTML = `
     <div class="stat-grid">
       <div class="stat-card"><div class="stat-label">Total Penjualan</div><div class="stat-value" style="color:var(--green)">${rp(totalPenjualan)}</div></div>
-      <div class="stat-card"><div class="stat-label">Pemasukan Manual</div><div class="stat-value" style="color:var(--green)">${rp(totalPemasukanManual)}</div></div>
       <div class="stat-card"><div class="stat-label">Modal Terjual</div><div class="stat-value" style="color:var(--red)">${rp(hargaAsliTerjual)}</div></div>
       <div class="stat-card"><div class="stat-label">Pengeluaran Manual</div><div class="stat-value" style="color:var(--red)">${rp(totalModalManual)}</div></div>
+      <div class="stat-card"><div class="stat-label">Total Dikurang</div><div class="stat-value" style="color:var(--red)">${rp(totalDikurang)}</div></div>
       <div class="stat-card full"><div class="stat-label">Penghasilan Bersih</div><div class="stat-value" style="color:${laba>=0?'#6ddc6d':'#ff7c7c'};font-size:22px;">${rp(laba)}</div></div>
     </div>`;
 
@@ -1599,7 +1449,6 @@ function saveEditModal() {
   saveState();
   closeModal('modal-edit-modal');
   renderModal();
-  renderHarian();
   toast('Pengeluaran diperbarui!');
 }
 function deleteModal(id) {
@@ -1681,12 +1530,12 @@ let compositeState = { add: [], edit: [] };
 
 function populateComponentSelect(prefix, excludeId) {
   const sel = document.getElementById(`${prefix}-topping-component-select`);
-  const options = sortByName(getAllToppings().filter(t => {
+  const options = getAllToppings().filter(t => {
     if (t.id === excludeId) return false;
     const def = findToppingDefById(t.id);
     if (def && def.components && def.components.length) return false;
     return true;
-  }));
+  });
   sel.innerHTML = options.map(t => `<option value="${t.id}">${t.name}</option>`).join('') || '<option value="">Belum ada topping lain</option>';
 }
 
@@ -1805,57 +1654,32 @@ function deleteTopping(menuId, toppingId) {
 }
 
 // ===== EXPORT / IMPORT =====
-function getCapPlugin(globalName, pluginName) {
-  if (window[globalName] && window[globalName][pluginName]) return window[globalName][pluginName];
-  if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins[pluginName]) return window.Capacitor.Plugins[pluginName];
-  return null;
-}
 async function exportData() {
-  const now = new Date();
-  const filename = `catatan-jualan-${now.toISOString().slice(0,10)}.json`;
-  const dataStr = JSON.stringify(state, null, 2);
-  const isNative = window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform();
+  try {
+    const { Filesystem, Share } = Capacitor.Plugins;
+    const fileName = `catatan-jualan-${todayStr()}.json`;
+    const jsonString = JSON.stringify(state, null, 2);
 
-  if (isNative) {
-    try {
-      const Filesystem = getCapPlugin('CapacitorFilesystem', 'Filesystem');
-      const Share = getCapPlugin('CapacitorShare', 'Share');
-      const EncodingEnum = (window.CapacitorFilesystem && window.CapacitorFilesystem.Encoding) || { UTF8: 'utf8' };
-      if (Filesystem && Share) {
-        const writeResult = await Filesystem.writeFile({
-          path: filename,
-          data: dataStr,
-          directory: 'CACHE',
-          encoding: EncodingEnum.UTF8,
-        });
-        await Share.share({
-          title: 'Export Data Catatan Jualan',
-          url: writeResult.uri,
-          dialogTitle: 'Simpan atau bagikan file backup ke...',
-        });
-        localStorage.setItem('last_export_date', todayStr());
-        toast('✅ Data berhasil diexport!');
-        return;
-      } else {
-        toast('⚠️ Fitur simpan file belum aktif, hubungi pengembang');
-        return;
-      }
-    } catch (err) {
-      console.error('Export gagal:', err);
-      toast('❌ Gagal export data: ' + (err && err.message ? err.message : 'unknown error'));
-      return;
-    }
+    const result = await Filesystem.writeFile({
+      path: fileName,
+      data: jsonString,
+      directory: 'CACHE',
+      encoding: 'utf8'
+    });
+
+    await Share.share({
+      title: 'Export Data Catatan Jualan',
+      text: 'Backup data Catatan Jualan',
+      url: result.uri,
+      dialogTitle: 'Simpan atau bagikan file backup'
+    });
+
+    localStorage.setItem('last_export_date', todayStr());
+    toast('✅ Data berhasil diexport!');
+  } catch (err) {
+    console.error(err);
+    toast('❌ Gagal export: ' + err.message);
   }
-  // Fallback: download biasa lewat browser (dipakai kalau dibuka di browser PC/tidak ada plugin native)
-  const blob = new Blob([dataStr], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  a.click();
-  URL.revokeObjectURL(url);
-  localStorage.setItem('last_export_date', todayStr());
-  toast('✅ Data berhasil diexport!');
 }
 function importData(event) {
   const file = event.target.files[0];
@@ -1865,24 +1689,42 @@ function importData(event) {
     try {
       const imported = JSON.parse(e.target.result);
       if (!confirm('Import akan menggabungkan data. Lanjutkan?')) return;
-      // Merge
+      // Merge orders & modals (skip duplicate id)
       const existingOrderIds = new Set(state.orders.map(o=>o.id));
       const existingModalIds = new Set(state.modals.map(m=>m.id));
-      const existingPemasukanIds = new Set(state.pemasukanManual.map(m=>m.id));
       if (imported.orders) imported.orders.forEach(o => { if (!existingOrderIds.has(o.id)) state.orders.push(o); });
       if (imported.modals) imported.modals.forEach(m => { if (!existingModalIds.has(m.id)) state.modals.push(m); });
-      if (imported.pemasukanManual) imported.pemasukanManual.forEach(m => { if (!existingPemasukanIds.has(m.id)) state.pemasukanManual.push(m); });
       if (imported.menus && imported.menus.length > 0) state.menus = imported.menus;
       if (imported.toppings && imported.toppings.length > 0) state.toppings = imported.toppings;
+
+      // Merge stocks (topping stock history)
       if (imported.stocks) {
-        Object.keys(imported.stocks).forEach(k => {
-          if (!state.stocks[k]) { state.stocks[k] = imported.stocks[k]; }
+        Object.keys(imported.stocks).forEach(tid => {
+          const importedStock = imported.stocks[tid];
+          if (!state.stocks[tid]) {
+            state.stocks[tid] = importedStock;
+          } else {
+            const existingRiwayat = state.stocks[tid].riwayat || [];
+            const existingKeys = new Set(existingRiwayat.map(r => `${r.date}|${r.jumlah}|${r.catatan}`));
+            (importedStock.riwayat || []).forEach(r => {
+              const key = `${r.date}|${r.jumlah}|${r.catatan}`;
+              if (!existingKeys.has(key)) existingRiwayat.push(r);
+            });
+            state.stocks[tid].riwayat = existingRiwayat;
+          }
         });
       }
+
       saveState();
       toast('✅ Data berhasil diimport!');
+      // Refresh all pages so imported data shows immediately
       renderOrderMenuList();
-    } catch(e) { toast('❌ File tidak valid!'); }
+      renderHarian();
+      renderBulanan();
+      renderStok();
+      renderModal();
+      renderMenuSettings();
+    } catch(err) { toast('❌ File tidak valid!'); }
   };
   reader.readAsText(file);
   event.target.value = '';
