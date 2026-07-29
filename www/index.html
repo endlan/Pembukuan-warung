@@ -340,6 +340,11 @@
     <input type="hidden" id="modal-filter-month">
     <input type="hidden" id="modal-filter-year">
 
+    <div class="section-title">Utang Pelanggan</div>
+    <div id="utang-summary"></div>
+    <div id="utang-quick-list" style="display:none;margin-bottom:12px;"></div>
+    <button class="btn btn-primary" style="margin-bottom:16px;" onclick="openUtangModal()">💳 Kelola Utang Pelanggan</button>
+
     <div class="section-title">Stok Topping</div>
     <div id="stok-list"></div>
 
@@ -549,6 +554,41 @@
   </div>
 </div>
 
+<!-- Modal Utang Pelanggan -->
+<div class="modal-overlay" id="modal-utang">
+  <div class="modal">
+    <div class="modal-title">💳 Utang Pelanggan</div>
+
+    <div class="card" style="margin-bottom:14px;">
+      <div class="form-group">
+        <label class="form-label">Nama Pelanggan</label>
+        <input type="text" class="form-input" id="utang-nama" placeholder="Misal: Budi" list="utang-nama-list">
+        <datalist id="utang-nama-list"></datalist>
+      </div>
+      <div class="input-row">
+        <div class="form-group" style="flex:1">
+          <label class="form-label">Jumlah (Rp)</label>
+          <input type="number" class="form-input" id="utang-jumlah" placeholder="0">
+        </div>
+        <div class="form-group" style="flex:1">
+          <label class="form-label">Tanggal</label>
+          <input type="date" class="form-input" id="utang-tanggal">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Keterangan (opsional)</label>
+        <input type="text" class="form-input" id="utang-keterangan" placeholder="Misal: 2x Pop Ice Coklat">
+      </div>
+      <button class="btn btn-primary" onclick="submitUtang()">+ Catat Utang</button>
+      <div style="font-size:11px;color:var(--gray);margin-top:6px;">💡 Nama yang sama otomatis digabung jadi 1, utangnya bertambah.</div>
+    </div>
+
+    <div id="utang-list"></div>
+
+    <button class="btn btn-outline" style="margin-top:14px;" onclick="closeModal('modal-utang')">Tutup</button>
+  </div>
+</div>
+
 <!-- Reminder Overlay -->
 <div class="reminder-overlay" id="reminder-overlay">
   <div class="reminder-box">
@@ -569,6 +609,7 @@ let state = {
   orders: [],
   modals: [],
   stocks: {}, // { toppingId: { stokAwal: N, riwayat: [{date, jumlah, catatan}] } }
+  utang: [], // { id, nama, jumlah, tanggal, keterangan, lunas, lunasDate }
 };
 let currentPayStatus = 'bayar';
 let selectedMenus = {}; // { menuId: { qty, toppings: [toppingId] } }
@@ -589,6 +630,23 @@ function loadState() {
   if (!state.orders) state.orders = [];
   if (!state.modals) state.modals = [];
   if (!state.stocks) state.stocks = {};
+  if (!state.utang) state.utang = [];
+  // Migrate old flat utang structure (1 record = 1 transaction) into grouped-by-name structure
+  if (state.utang.length > 0 && state.utang[0].riwayat === undefined) {
+    const grouped = {};
+    state.utang.forEach(u => {
+      const key = (u.nama||'').trim().toLowerCase();
+      if (!key) return;
+      if (!grouped[key]) grouped[key] = { id: uid(), nama: u.nama.trim(), total: 0, riwayat: [] };
+      grouped[key].riwayat.push({ id: uid(), tanggal: u.tanggal, jumlah: u.jumlah, keterangan: u.keterangan, tipe: 'utang' });
+      if (!u.lunas) {
+        grouped[key].total += u.jumlah;
+      } else {
+        grouped[key].riwayat.push({ id: uid(), tanggal: u.lunasDate || u.tanggal, jumlah: u.jumlah, keterangan: 'Pelunasan', tipe: 'bayar' });
+      }
+    });
+    state.utang = Object.values(grouped);
+  }
   saveState();
 }
 
@@ -1467,6 +1525,7 @@ function submitEditStokSemua() {
 // ===== MODAL/PENGELUARAN =====
 function renderModal() {
   renderStok();
+  renderUtangSummary();
   const month = +document.getElementById('modal-filter-month').value;
   const year = +document.getElementById('modal-filter-year').value;
   const modals = state.modals.filter(m => {
@@ -1572,6 +1631,200 @@ function deleteModal(id) {
   renderHarian();
   renderOrderModalLists();
   toast('Dihapus.');
+}
+
+// ===== UTANG PELANGGAN =====
+function renderUtangSummary() {
+  const el = document.getElementById('utang-summary');
+  if (!el) return;
+  const belumLunas = state.utang.filter(u => u.total > 0);
+  const total = belumLunas.reduce((s,u) => s + u.total, 0);
+  el.innerHTML = `
+    <div class="card" style="margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;${belumLunas.length > 0 ? 'cursor:pointer;' : ''}" ${belumLunas.length > 0 ? `onclick="toggleUtangQuickList()"` : ''}>
+      <div>
+        <div style="font-size:11px;color:var(--gray);">Total Belum Lunas</div>
+        <div style="font-size:18px;font-weight:800;color:var(--red);">${rp(total)}</div>
+      </div>
+      <div style="font-size:11px;color:var(--gray);display:flex;align-items:center;gap:4px;">
+        ${belumLunas.length > 0 ? `<span id="utang-quick-chevron">▾</span>` : ''}
+        <span>${belumLunas.length} orang</span>
+      </div>
+    </div>`;
+  renderUtangQuickList();
+}
+
+function toggleUtangQuickList() {
+  const el = document.getElementById('utang-quick-list');
+  const chevron = document.getElementById('utang-quick-chevron');
+  if (!el) return;
+  const showing = el.style.display !== 'none';
+  el.style.display = showing ? 'none' : 'block';
+  if (chevron) chevron.textContent = showing ? '▾' : '▴';
+}
+
+function toggleUtangPersonQuick(id) {
+  const el = document.getElementById('quick-riwayat-' + id);
+  if (!el) return;
+  el.style.display = el.style.display === 'none' ? 'block' : 'none';
+}
+
+function renderUtangRiwayatRows(person, withActions) {
+  return [...person.riwayat].sort((a,b)=>b.tanggal.localeCompare(a.tanggal)).map(r => `
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;">
+      <div>
+        <div style="font-size:12px;">${r.tipe === 'bayar' ? '💰 ' + (r.keterangan||'Pembayaran') : '🛒 ' + (r.keterangan||'Utang baru')}</div>
+        <div style="font-size:10px;color:var(--gray);">${fmtDateShort(r.tanggal)}</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:6px;">
+        <span style="font-size:12px;font-weight:700;color:${r.tipe==='bayar'?'var(--green)':'var(--red)'};">${r.tipe==='bayar'?'-':'+'}${rp(r.jumlah)}</span>
+        ${withActions ? `<button class="btn btn-sm btn-delete" style="padding:2px 8px;font-size:10px;" onclick="deleteUtangRiwayat('${person.id}','${r.id}')">✕</button>` : ''}
+      </div>
+    </div>
+  `).join('');
+}
+
+function renderUtangQuickList() {
+  const el = document.getElementById('utang-quick-list');
+  if (!el) return;
+  const wasOpen = el.style.display === 'block';
+  const belumLunas = [...state.utang].filter(u => u.total > 0).sort((a,b) => b.total - a.total);
+  if (belumLunas.length === 0) {
+    el.innerHTML = '';
+    el.style.display = 'none';
+    return;
+  }
+  el.innerHTML = belumLunas.map(person => `
+    <div class="card" style="margin-bottom:6px;padding:10px 14px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;cursor:pointer;" onclick="toggleUtangPersonQuick('${person.id}')">
+        <div style="font-size:13px;font-weight:600;">${person.nama}</div>
+        <div style="font-size:13px;font-weight:800;color:var(--red);">${rp(person.total)}</div>
+      </div>
+      <div id="quick-riwayat-${person.id}" style="display:none;margin-top:8px;padding-top:8px;border-top:1px solid var(--border);">
+        ${renderUtangRiwayatRows(person, false)}
+      </div>
+    </div>`).join('');
+  el.style.display = wasOpen ? 'block' : 'none';
+}
+
+function openUtangModal() {
+  document.getElementById('utang-tanggal').value = todayStr();
+  renderUtang();
+  openModal('modal-utang');
+}
+
+function findOrCreateUtangPerson(nama) {
+  const key = nama.trim().toLowerCase();
+  let person = state.utang.find(u => u.nama.trim().toLowerCase() === key);
+  if (!person) {
+    person = { id: uid(), nama: nama.trim(), total: 0, riwayat: [] };
+    state.utang.push(person);
+  }
+  return person;
+}
+
+function submitUtang() {
+  const nama = document.getElementById('utang-nama').value.trim();
+  const jumlah = parseFloat(document.getElementById('utang-jumlah').value);
+  const tanggal = document.getElementById('utang-tanggal').value || todayStr();
+  const keterangan = document.getElementById('utang-keterangan').value.trim();
+  if (!nama) { toast('Isi nama pelanggan dulu!'); return; }
+  if (!jumlah || jumlah <= 0) { toast('Isi jumlah yang valid!'); return; }
+  const person = findOrCreateUtangPerson(nama);
+  person.total += jumlah;
+  person.riwayat.push({ id: uid(), tanggal, jumlah, keterangan, tipe: 'utang' });
+  saveState();
+  document.getElementById('utang-nama').value = '';
+  document.getElementById('utang-jumlah').value = '';
+  document.getElementById('utang-keterangan').value = '';
+  renderUtang();
+  renderUtangSummary();
+  toast(`✅ Utang ${person.nama} dicatat!`);
+}
+
+function bayarUtang(id) {
+  const person = state.utang.find(x => x.id === id);
+  if (!person) return;
+  const input = prompt(`Bayar berapa untuk ${person.nama}? (Sisa utang: ${rp(person.total)})`, person.total);
+  if (input === null) return;
+  const jumlah = parseFloat(input);
+  if (!jumlah || jumlah <= 0) { toast('Jumlah tidak valid!'); return; }
+  const bayarAmount = Math.min(jumlah, person.total);
+  person.total -= bayarAmount;
+  person.riwayat.push({ id: uid(), tanggal: todayStr(), jumlah: bayarAmount, keterangan: 'Pembayaran', tipe: 'bayar' });
+  saveState();
+  renderUtang();
+  renderUtangSummary();
+  toast(person.total <= 0 ? `✅ ${person.nama} lunas!` : `✅ Pembayaran ${person.nama} dicatat!`);
+}
+
+function deleteUtangPerson(id) {
+  const person = state.utang.find(x => x.id === id);
+  if (!person) return;
+  if (!confirm(`Hapus semua catatan utang ${person.nama}?`)) return;
+  state.utang = state.utang.filter(x => x.id !== id);
+  saveState();
+  renderUtang();
+  renderUtangSummary();
+  toast('Catatan dihapus.');
+}
+
+function deleteUtangRiwayat(personId, riwayatId) {
+  const person = state.utang.find(x => x.id === personId);
+  if (!person) return;
+  const r = person.riwayat.find(x => x.id === riwayatId);
+  if (!r) return;
+  if (!confirm('Hapus transaksi ini?')) return;
+  person.total += (r.tipe === 'utang' ? -r.jumlah : r.jumlah);
+  person.riwayat = person.riwayat.filter(x => x.id !== riwayatId);
+  saveState();
+  renderUtang();
+  renderUtangSummary();
+  toast('Transaksi dihapus.');
+}
+
+function toggleUtangRiwayat(id) {
+  const el = document.getElementById('riwayat-' + id);
+  if (!el) return;
+  el.style.display = el.style.display === 'none' ? 'block' : 'none';
+}
+
+function renderUtang() {
+  const belumLunas = [...state.utang].filter(u => u.total > 0).sort((a,b) => b.total - a.total);
+  const lunas = [...state.utang].filter(u => u.total <= 0 && u.riwayat.length > 0);
+
+  const renderRiwayat = (person) => `
+    <div id="riwayat-${person.id}" style="display:none;margin-top:8px;padding-top:8px;border-top:1px solid var(--border);">
+      ${renderUtangRiwayatRows(person, true)}
+    </div>`;
+
+  const renderPersonCard = (person) => `
+    <div class="card" style="margin-bottom:8px;">
+      <div class="card-row">
+        <div style="font-size:14px;font-weight:700;">${person.nama}</div>
+        <div style="font-size:16px;font-weight:800;color:${person.total>0?'var(--red)':'var(--green)'};">${person.total>0?rp(person.total):'Lunas ✅'}</div>
+      </div>
+      <div style="display:flex;gap:6px;margin-top:8px;">
+        <button class="btn btn-sm btn-outline" style="flex:1;" onclick="toggleUtangRiwayat('${person.id}')">📋 Riwayat (${person.riwayat.length})</button>
+        ${person.total > 0 ? `<button class="btn btn-sm btn-green" style="flex:1;" onclick="bayarUtang('${person.id}')">💰 Bayar</button>` : ''}
+        <button class="btn btn-sm btn-delete" onclick="deleteUtangPerson('${person.id}')">Hapus</button>
+      </div>
+      ${renderRiwayat(person)}
+    </div>`;
+
+  document.getElementById('utang-list').innerHTML = `
+    <div class="section-title" style="color:var(--red);">Belum Lunas (${belumLunas.length})</div>
+    ${belumLunas.length === 0 ? '<div style="font-size:12px;color:var(--gray);margin-bottom:12px;">Tidak ada utang belum lunas.</div>' : belumLunas.map(renderPersonCard).join('')}
+    ${lunas.length > 0 ? `
+      <div class="section-title" style="color:var(--green);margin-top:16px;">Riwayat Lunas (${lunas.length})</div>
+      ${lunas.map(renderPersonCard).join('')}
+    ` : ''}
+  `;
+
+  const datalistEl = document.getElementById('utang-nama-list');
+  if (datalistEl) {
+    const namaUnik = [...new Set(state.utang.map(u => u.nama))];
+    datalistEl.innerHTML = namaUnik.map(n => `<option value="${n}">`).join('');
+  }
 }
 
 // ===== MENU SETTINGS =====
@@ -1806,8 +2059,10 @@ function importData(event) {
       // Merge orders & modals (skip duplicate id)
       const existingOrderIds = new Set(state.orders.map(o=>o.id));
       const existingModalIds = new Set(state.modals.map(m=>m.id));
+      const existingUtangIds = new Set((state.utang||[]).map(u=>u.id));
       if (imported.orders) imported.orders.forEach(o => { if (!existingOrderIds.has(o.id)) state.orders.push(o); });
       if (imported.modals) imported.modals.forEach(m => { if (!existingModalIds.has(m.id)) state.modals.push(m); });
+      if (imported.utang) imported.utang.forEach(u => { if (!existingUtangIds.has(u.id)) state.utang.push(u); });
       if (imported.menus && imported.menus.length > 0) state.menus = imported.menus;
       if (imported.toppings && imported.toppings.length > 0) state.toppings = imported.toppings;
 
