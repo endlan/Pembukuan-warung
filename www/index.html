@@ -11,6 +11,8 @@
     --white: #ffffff;
     --dark: #1c1c1e;
     --dark2: #2c2c2e;
+    --text: #1c1c1e;
+    --muted-bg: #f0f0f0;
     --accent: #e86c3a;
     --accent2: #f0a070;
     --green: #2e7d32;
@@ -23,8 +25,21 @@
     --border: #e0ddd6;
     --shadow: 0 2px 12px rgba(0,0,0,0.08);
   }
+  :root[data-theme="dark"] {
+    --bg: #121214;
+    --white: #1e1e21;
+    --dark2: #2c2c2e;
+    --text: #f0f0f0;
+    --muted-bg: #2c2c2e;
+    --green-bg: #1b3320;
+    --red-bg: #3a1c1c;
+    --yellow-bg: #3a2f10;
+    --gray: #9a9a9e;
+    --border: #333336;
+    --shadow: 0 2px 12px rgba(0,0,0,0.4);
+  }
   * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
-  body { font-family:'Plus Jakarta Sans',sans-serif; background:var(--bg); color:var(--dark); min-height:100vh; }
+  body { font-family:'Plus Jakarta Sans',sans-serif; background:var(--bg); color:var(--text); min-height:100vh; }
   
   /* Pages */
   .page { display:none; min-height:100vh; padding-bottom:80px; }
@@ -75,7 +90,7 @@
   .btn-primary:active { transform:scale(0.98); }
   .btn-accent { background:var(--accent); color:#fff; padding:13px 20px; font-size:14px; width:100%; }
   .btn-sm { padding:5px 12px; font-size:12px; }
-  .btn-edit { background:#f0f0f0; color:var(--dark); }
+  .btn-edit { background:var(--muted-bg); color:var(--text); }
   .btn-delete { background:var(--red-bg); color:var(--red); }
   .btn-green { background:var(--green-bg); color:var(--green); }
   .btn-outline { background:transparent; border:1.5px solid var(--border); color:var(--gray); padding:11px 20px; font-size:13px; width:100%; }
@@ -100,7 +115,7 @@
   .badge-green { background:var(--green-bg); color:var(--green); }
   .badge-red { background:var(--red-bg); color:var(--red); }
   .badge-yellow { background:var(--yellow-bg); color:var(--yellow); }
-  .badge-gray { background:#f0f0f0; color:var(--gray); }
+  .badge-gray { background:var(--muted-bg); color:var(--gray); }
 
   /* Section title */
   .section-title { font-size:11px; color:var(--gray); text-transform:uppercase; letter-spacing:1.5px; font-weight:700; margin:18px 0 8px; }
@@ -241,7 +256,7 @@
     <div class="section-title">Status Pembayaran</div>
     <div style="display:flex; gap:8px; margin-bottom:16px;">
       <button class="btn btn-sm" id="btn-bayar" onclick="setPayStatus('bayar')" style="flex:1;padding:10px;border-radius:10px;background:var(--dark);color:#fff;border:none;font-family:'Plus Jakarta Sans',sans-serif;font-weight:600;">✅ Bayar</button>
-      <button class="btn btn-sm" id="btn-gratis" onclick="setPayStatus('gratis')" style="flex:1;padding:10px;border-radius:10px;background:#f0f0f0;color:var(--gray);border:none;font-family:'Plus Jakarta Sans',sans-serif;font-weight:600;">🎁 Gratis</button>
+      <button class="btn btn-sm" id="btn-gratis" onclick="setPayStatus('gratis')" style="flex:1;padding:10px;border-radius:10px;background:var(--muted-bg);color:var(--gray);border:none;font-family:'Plus Jakarta Sans',sans-serif;font-weight:600;">🎁 Gratis</button>
     </div>
     <div class="form-group">
       <label class="form-label">Catatan (opsional)</label>
@@ -290,7 +305,12 @@
     </div>
   </div>
   <div class="scroll-content">
-    <input type="hidden" id="filter-date">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+      <button class="btn btn-outline" style="width:auto;padding:11px 16px;" onclick="changeHarianDate(-1)">◀</button>
+      <input type="date" class="form-input" id="filter-date" style="flex:1;text-align:center;" onchange="renderHarian()">
+      <button class="btn btn-outline" style="width:auto;padding:11px 16px;" onclick="changeHarianDate(1)">▶</button>
+    </div>
+    <button class="btn btn-outline" style="margin-bottom:14px;" onclick="setHarianToday()">📅 Hari Ini</button>
     <div id="harian-stats"></div>
 
     <div class="section-title" style="color:var(--green);">💰 Pemasukan Manual</div>
@@ -800,9 +820,9 @@ function changeToppingQty(menuId, toppingId, delta) {
 
 function setPayStatus(status) {
   currentPayStatus = status;
-  document.getElementById('btn-bayar').style.background = status === 'bayar' ? 'var(--dark)' : '#f0f0f0';
+  document.getElementById('btn-bayar').style.background = status === 'bayar' ? 'var(--dark)' : 'var(--muted-bg)';
   document.getElementById('btn-bayar').style.color = status === 'bayar' ? '#fff' : 'var(--gray)';
-  document.getElementById('btn-gratis').style.background = status === 'gratis' ? 'var(--accent)' : '#f0f0f0';
+  document.getElementById('btn-gratis').style.background = status === 'gratis' ? 'var(--accent)' : 'var(--muted-bg)';
   document.getElementById('btn-gratis').style.color = status === 'gratis' ? '#fff' : 'var(--gray)';
 }
 
@@ -851,6 +871,18 @@ function submitOrder() {
 }
 
 // ===== REKAP HARIAN =====
+function changeHarianDate(delta) {
+  const el = document.getElementById('filter-date');
+  if (!el.value) el.value = todayStr();
+  const d = new Date(el.value + 'T00:00:00');
+  d.setDate(d.getDate() + delta);
+  el.value = d.toISOString().slice(0,10);
+  renderHarian();
+}
+function setHarianToday() {
+  document.getElementById('filter-date').value = todayStr();
+  renderHarian();
+}
 function renderHarian() {
   const dateEl = document.getElementById('filter-date');
   if (!dateEl.value) dateEl.value = todayStr();
