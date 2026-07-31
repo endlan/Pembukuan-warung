@@ -691,7 +691,13 @@ function fmtDateShort(str) {
   const d = new Date(str);
   return d.toLocaleDateString('id-ID', { day:'numeric', month:'short' });
 }
-function todayStr() { return new Date().toISOString().slice(0,10); }
+function todayStr() {
+  const d = new Date();
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+}
 
 // ===== NAVIGATION =====
 function showPage(pageId) {
@@ -2184,61 +2190,13 @@ function importData(event) {
   reader.onload = e => {
     try {
       const imported = JSON.parse(e.target.result);
-      if (!confirm('Import akan menggabungkan data. Lanjutkan?')) return;
-      // Merge orders & modals (skip duplicate id)
-      const existingOrderIds = new Set(state.orders.map(o=>o.id));
-      const existingModalIds = new Set(state.modals.map(m=>m.id));
-      const existingUtangIds = new Set((state.utang||[]).map(u=>u.id));
-      if (imported.orders) imported.orders.forEach(o => { if (!existingOrderIds.has(o.id)) state.orders.push(o); });
-      if (imported.modals) imported.modals.forEach(m => { if (!existingModalIds.has(m.id)) state.modals.push(m); });
-      if (imported.utang) imported.utang.forEach(u => { if (!existingUtangIds.has(u.id)) state.utang.push(u); });
+      if (!confirm('⚠️ Import akan MENGGANTI SELURUH data saat ini (order, stok, pengeluaran/pemasukan, utang, menu) dengan data dari file backup ini. Data lokal yang belum di-backup akan HILANG PERMANEN. Lanjutkan?')) return;
 
-      // Merge menus & toppings. Match by NAME first (case-insensitive), not just id,
-      // karena tiap HP bikin menu/topping sendiri-sendiri jadi ID-nya beda walau
-      // nama itemnya sama persis. idRemap dipakai supaya data stok yang di-import
-      // (yang nempel ke ID dari HP asal) nyambung ke topping lokal yang sama.
-      const idRemap = {};
-      if (imported.menus && imported.menus.length > 0) {
-        imported.menus.forEach(im => {
-          const existingMenu = state.menus.find(m => m.id === im.id)
-            || state.menus.find(m => m.name.trim().toLowerCase() === im.name.trim().toLowerCase());
-          if (!existingMenu) {
-            state.menus.push(im);
-          } else {
-            (im.toppings || []).forEach(t => {
-              const existingTopping = existingMenu.toppings.find(et => et.id === t.id)
-                || existingMenu.toppings.find(et => et.name.trim().toLowerCase() === t.name.trim().toLowerCase());
-              if (!existingTopping) {
-                existingMenu.toppings.push(t);
-              } else if (existingTopping.id !== t.id) {
-                idRemap[t.id] = existingTopping.id;
-              }
-            });
-          }
-        });
-      }
-
-      // Merge stocks (topping stock history), pakai idRemap biar nyambung ke topping lokal
-      if (imported.stocks) {
-        Object.keys(imported.stocks).forEach(rawTid => {
-          const tid = idRemap[rawTid] || rawTid;
-          const importedStock = imported.stocks[rawTid];
-          const existing = state.stocks[tid];
-          const existingKosong = !existing || ((existing.total || 0) === 0 && (!existing.riwayat || existing.riwayat.length === 0));
-          if (existingKosong) {
-            // Lokal belum pernah beneran diisi, langsung pakai data hasil import.
-            state.stocks[tid] = importedStock;
-          } else {
-            const existingRiwayat = existing.riwayat || [];
-            const existingKeys = new Set(existingRiwayat.map(r => `${r.date}|${r.jumlah}|${r.catatan}`));
-            (importedStock.riwayat || []).forEach(r => {
-              const key = `${r.date}|${r.jumlah}|${r.catatan}`;
-              if (!existingKeys.has(key)) existingRiwayat.push(r);
-            });
-            existing.riwayat = existingRiwayat;
-          }
-        });
-      }
+      state.menus = imported.menus || [];
+      state.orders = imported.orders || [];
+      state.modals = imported.modals || [];
+      state.utang = imported.utang || [];
+      state.stocks = imported.stocks || {};
 
       saveState();
       toast('✅ Data berhasil diimport!');
