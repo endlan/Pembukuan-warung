@@ -1292,21 +1292,31 @@ function deleteOrderFromBulanan(orderId, date) {
 function getToppingGroups() {
   // Groups toppings by name (case-insensitive, trimmed) so the same item
   // shared across menus (e.g. "baso" in 2 menus) is treated as one stock item.
-  // Each group "lives" under the menu where it first appears.
+  // The group "lives" under whichever menu holds the non-komposit (stok mandiri)
+  // version, so a same-name komposit entry in another menu doesn't steal it.
   const groups = {};
   const order = [];
   state.menus.forEach(m => {
     m.toppings.forEach(t => {
       const key = t.name.trim().toLowerCase();
       if (!groups[key]) {
-        groups[key] = { key, name: t.name, ids: [t.id], menuId: m.id };
+        groups[key] = { key, name: t.name, entries: [{ id: t.id, menuId: m.id }] };
         order.push(key);
-      } else if (!groups[key].ids.includes(t.id)) {
-        groups[key].ids.push(t.id);
+      } else if (!groups[key].entries.some(e => e.id === t.id)) {
+        groups[key].entries.push({ id: t.id, menuId: m.id });
       }
     });
   });
-  return order.map(k => groups[k]);
+  return order.map(k => {
+    const g = groups[k];
+    const ids = g.entries.map(e => e.id);
+    let home = g.entries.find(e => {
+      const def = findToppingDefById(e.id);
+      return !(def && def.components && def.components.length > 0);
+    });
+    if (!home) home = g.entries[0];
+    return { key: g.key, name: g.name, ids, menuId: home.menuId };
+  });
 }
 
 function getAllToppings() {
