@@ -2156,8 +2156,21 @@ function importData(event) {
       if (imported.orders) imported.orders.forEach(o => { if (!existingOrderIds.has(o.id)) state.orders.push(o); });
       if (imported.modals) imported.modals.forEach(m => { if (!existingModalIds.has(m.id)) state.modals.push(m); });
       if (imported.utang) imported.utang.forEach(u => { if (!existingUtangIds.has(u.id)) state.utang.push(u); });
-      if (imported.menus && imported.menus.length > 0) state.menus = imported.menus;
-      if (imported.toppings && imported.toppings.length > 0) state.toppings = imported.toppings;
+
+      // Merge menus & toppings (skip replacing wholesale, so items don't get wiped)
+      if (imported.menus && imported.menus.length > 0) {
+        imported.menus.forEach(im => {
+          const existingMenu = state.menus.find(m => m.id === im.id);
+          if (!existingMenu) {
+            state.menus.push(im);
+          } else {
+            const existingToppingIds = new Set(existingMenu.toppings.map(t => t.id));
+            (im.toppings || []).forEach(t => {
+              if (!existingToppingIds.has(t.id)) existingMenu.toppings.push(t);
+            });
+          }
+        });
+      }
 
       // Merge stocks (topping stock history)
       if (imported.stocks) {
