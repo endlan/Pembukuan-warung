@@ -2223,16 +2223,19 @@ function importData(event) {
         Object.keys(imported.stocks).forEach(rawTid => {
           const tid = idRemap[rawTid] || rawTid;
           const importedStock = imported.stocks[rawTid];
-          if (!state.stocks[tid]) {
+          const existing = state.stocks[tid];
+          const existingKosong = !existing || ((existing.total || 0) === 0 && (!existing.riwayat || existing.riwayat.length === 0));
+          if (existingKosong) {
+            // Lokal belum pernah beneran diisi, langsung pakai data hasil import.
             state.stocks[tid] = importedStock;
           } else {
-            const existingRiwayat = state.stocks[tid].riwayat || [];
+            const existingRiwayat = existing.riwayat || [];
             const existingKeys = new Set(existingRiwayat.map(r => `${r.date}|${r.jumlah}|${r.catatan}`));
             (importedStock.riwayat || []).forEach(r => {
               const key = `${r.date}|${r.jumlah}|${r.catatan}`;
               if (!existingKeys.has(key)) existingRiwayat.push(r);
             });
-            state.stocks[tid].riwayat = existingRiwayat;
+            existing.riwayat = existingRiwayat;
           }
         });
       }
