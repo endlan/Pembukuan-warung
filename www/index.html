@@ -393,7 +393,7 @@
     </div>
 
     <div class="section-title">Daftar Menu & Topping</div>
-    <button class="btn btn-outline" style="margin-bottom:12px;" onclick="toggleCekTopping()">🔍 Cek Semua Topping (baca semua menu)</button>
+    <button class="btn btn-outline" style="margin-bottom:12px;" onclick="toggleCekTopping()">🔍 Cek Kesesuaian Menu ↔ Stok</button>
     <div id="cek-topping-box" style="display:none;margin-bottom:16px;"></div>
     <div id="menu-list-settings"></div>
 
@@ -1314,6 +1314,26 @@ function getAllToppings() {
   return getToppingGroups().map(g => ({ id: g.ids[0], name: g.name }));
 }
 
+// Sebuah grup (nama topping yang sama, lintas menu) baru dianggap "komposit"
+// (tidak punya stok sendiri) kalau SEMUA id di dalamnya komposit. Kalau ada
+// minimal 1 yang berdiri sendiri, grup itu tetap punya stok sendiri.
+function groupIsComposite(g) {
+  return g.ids.every(id => {
+    const def = findToppingDefById(id);
+    return def && def.components && def.components.length > 0;
+  });
+}
+// Pilih id yang dipakai buat baca/simpan data stok: utamakan yang BUKAN
+// komposit, supaya grup dengan 1 entri komposit + 1 entri mandiri (nama sama)
+// tetap nyimpen stoknya ke entri yang mandiri.
+function getGroupCanonicalId(g) {
+  for (const id of g.ids) {
+    const def = findToppingDefById(id);
+    if (!(def && def.components && def.components.length > 0)) return id;
+  }
+  return g.ids[0];
+}
+
 function toggleCekTopping() {
   const el = document.getElementById('cek-topping-box');
   if (!el) return;
@@ -1333,33 +1353,49 @@ function renderCekTopping() {
   });
   semua.sort((a, b) => a.name.localeCompare(b.name, 'id'));
 
-  // Cek referensi komponen yang rusak (nunjuk ke topping yang sudah nggak ada)
   const bermasalah = [];
-  semua.forEach(t => {
-    if (t.components && t.components.length) {
+  const items = semua.map(t => {
+    const isComposite = t.components && t.components.length > 0;
+    let status, ok = true;
+    if (!isComposite) {
+      status = '✅ Muncul di Modal/Stok';
+    } else {
+      const namaKomponen = [];
+      let rusak = false;
       t.components.forEach(c => {
-        if (!findToppingDefById(c.toppingId)) {
-          bermasalah.push({ nama: t.name, menu: t.menuName, komponenHilang: c.toppingId });
-        }
+        const def = findToppingDefById(c.toppingId);
+        if (def) { namaKomponen.push(def.name); }
+        else { rusak = true; }
       });
+      if (rusak) {
+        status = '⚠️ Error - komponen hilang, tidak muncul di Stok';
+        ok = false;
+        bermasalah.push({ nama: t.name, menu: t.menuName });
+      } else {
+        status = `🔗 Komposit — stok ikut: ${namaKomponen.join(', ')} (sengaja tidak muncul di Stok)`;
+      }
     }
+    return { ...t, status, ok };
   });
 
   let html = `<div class="card" style="margin-bottom:10px;">
-    <div style="font-size:12px;color:var(--gray);margin-bottom:8px;">Total ${semua.length} topping di ${state.menus.length} menu:</div>
-    ${semua.map(t => `
-      <div style="display:flex;justify-content:space-between;padding:4px 0;font-size:13px;border-bottom:1px solid var(--border);">
-        <span>${t.name}</span>
-        <span style="color:var(--gray);font-size:11px;">${t.menuName}</span>
+    <div style="font-size:12px;color:var(--gray);margin-bottom:8px;">Total ${items.length} topping di ${state.menus.length} menu:</div>
+    ${items.map(t => `
+      <div style="padding:6px 0;border-bottom:1px solid var(--border);">
+        <div style="display:flex;justify-content:space-between;">
+          <span style="font-size:13px;font-weight:600;">${t.name}</span>
+          <span style="color:var(--gray);font-size:11px;">${t.menuName}</span>
+        </div>
+        <div style="font-size:11px;color:${t.ok ? 'var(--gray)' : 'var(--red)'};margin-top:2px;">${t.status}</div>
       </div>
     `).join('')}
   </div>`;
 
   if (bermasalah.length > 0) {
     html += `<div class="card" style="border:1px solid var(--red);">
-      <div style="font-size:13px;font-weight:700;color:var(--red);margin-bottom:6px;">⚠️ Ditemukan ${bermasalah.length} referensi rusak</div>
-      ${bermasalah.map(b => `<div style="font-size:12px;margin-bottom:4px;">"${b.nama}" (di menu ${b.menu}) memotong stok dari topping yang sudah tidak ada.</div>`).join('')}
-      <div style="font-size:11px;color:var(--gray);margin-top:6px;">Buka Edit Topping-nya, hapus komponen yang rusak, lalu simpan ulang.</div>
+      <div style="font-size:13px;font-weight:700;color:var(--red);margin-bottom:6px;">⚠️ Ditemukan ${bermasalah.length} topping bermasalah</div>
+      ${bermasalah.map(b => `<div style="font-size:12px;margin-bottom:4px;">"${b.nama}" (di menu ${b.menu}) memotong stok dari topping yang sudah tidak ada, jadi tidak muncul di halaman Modal/Stok.</div>`).join('')}
+      <div style="font-size:11px;color:var(--gray);margin-top:6px;">Buka Edit Topping-nya, hapus komponen yang rusak (atau matikan "Potong stok dari barang lain" kalau memang harusnya berdiri sendiri), lalu simpan ulang.</div>
     </div>`;
   } else {
     html += `<div class="card" style="border:1px solid var(--green);">
@@ -1439,12 +1475,9 @@ function undoStok() {
 function refreshBaselineStok() {
   if (!confirm('Refresh baseline? Stok akan disesuaikan ke sisa saat ini, dan "Terjual" mulai dihitung ulang dari 0.')) return;
   saveStokUndoSnapshot();
-  const groups = getToppingGroups().filter(g => {
-    const def = findToppingDefById(g.ids[0]);
-    return !(def && def.components && def.components.length > 0);
-  });
+  const groups = getToppingGroups().filter(g => !groupIsComposite(g));
   groups.forEach(g => {
-    const canonicalId = g.ids[0];
+    const canonicalId = getGroupCanonicalId(g);
     if (!state.stocks[canonicalId]) state.stocks[canonicalId] = { total: 0, baselineDate: null, riwayat: [] };
     const stokData = state.stocks[canonicalId];
     const terjual = getTerjualSince(g.ids, stokData.baselineDate);
@@ -1477,24 +1510,20 @@ function renderStok(editMode = false) {
     </div>
     ${menus.map(m => {
       const menuGroupsSorted = sortByName(groups.filter(g => g.menuId === m.id));
-      const isCompositeGroup = g => {
-        const def = findToppingDefById(g.ids[0]);
-        return !!(def && def.components && def.components.length > 0);
-      };
       const menuGroups = [
-        ...menuGroupsSorted.filter(g => !isCompositeGroup(g)),
-        ...menuGroupsSorted.filter(g => isCompositeGroup(g)),
+        ...menuGroupsSorted.filter(g => !groupIsComposite(g)),
+        ...menuGroupsSorted.filter(g => groupIsComposite(g)),
       ];
       return `
       <div style="margin-bottom:18px;">
         <div style="background:var(--dark);color:#fff;font-size:12px;font-weight:800;letter-spacing:1px;text-transform:uppercase;padding:8px 12px;border-radius:8px;margin-bottom:8px;">${m.name}</div>
         ${menuGroups.length === 0 ? '<div style="font-size:12px;color:var(--gray);margin-bottom:8px;">Belum ada topping/barang</div>' :
           menuGroups.map(g => {
-            const canonicalId = g.ids[0];
-            const def = findToppingDefById(canonicalId);
-            const isComposite = def && def.components && def.components.length > 0;
+            const canonicalId = getGroupCanonicalId(g);
+            const isComposite = groupIsComposite(g);
 
             if (isComposite) {
+              const def = findToppingDefById(canonicalId);
               const compLabel = def.components.map(c => {
                 const compDef = findToppingDefById(c.toppingId);
                 return `${compDef ? compDef.name : '?'} ×${c.qty}`;
@@ -1542,7 +1571,7 @@ function simpanEditStok() {
   saveStokUndoSnapshot();
   const groups = getToppingGroups();
   groups.forEach(g => {
-    const canonicalId = g.ids[0];
+    const canonicalId = getGroupCanonicalId(g);
     const input = document.getElementById(`stok-input-${canonicalId}`);
     if (!input) return;
     const val = parseInt(input.value) || 0;
@@ -1550,7 +1579,7 @@ function simpanEditStok() {
     state.stocks[canonicalId].total = val;
     state.stocks[canonicalId].baselineDate = Date.now();
     // Keep other ids sharing this name in sync at 0 so totals never double-count.
-    g.ids.slice(1).forEach(otherId => {
+    g.ids.filter(id => id !== canonicalId).forEach(otherId => {
       if (!state.stocks[otherId]) state.stocks[otherId] = { total: 0, baselineDate: null, riwayat: [] };
       state.stocks[otherId].total = 0;
     });
@@ -1561,10 +1590,7 @@ function simpanEditStok() {
 }
 
 function openEditStokSemua() {
-  const groups = getToppingGroups().filter(g => {
-    const def = findToppingDefById(g.ids[0]);
-    return !(def && def.components && def.components.length > 0);
-  });
+  const groups = getToppingGroups().filter(g => !groupIsComposite(g));
   const menus = sortByName(state.menus);
   document.getElementById('edit-stok-semua-form').innerHTML = menus.map(m => {
     const menuGroups = sortByName(groups.filter(g => g.menuId === m.id));
@@ -1573,7 +1599,7 @@ function openEditStokSemua() {
       <div style="margin-bottom:14px;">
         <div style="background:var(--dark);color:#fff;font-size:11px;font-weight:800;letter-spacing:1px;text-transform:uppercase;padding:6px 10px;border-radius:8px;margin-bottom:8px;">${m.name}</div>
         ${menuGroups.map(g => {
-          const canonicalId = g.ids[0];
+          const canonicalId = getGroupCanonicalId(g);
           const stokData = state.stocks[canonicalId] || { total: 0, baselineDate: null };
           const terjual = getTerjualSince(g.ids, stokData.baselineDate);
           const sisa = stokData.total - terjual;
@@ -1593,7 +1619,7 @@ function submitEditStokSemua() {
   const groups = getToppingGroups();
   let ada = false;
   groups.forEach(g => {
-    const canonicalId = g.ids[0];
+    const canonicalId = getGroupCanonicalId(g);
     const input = document.getElementById(`restok-input-${canonicalId}`);
     if (!input) return;
     const val = parseInt(input.value) || 0;
