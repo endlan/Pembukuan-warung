@@ -2193,25 +2193,36 @@ function importData(event) {
       if (imported.modals) imported.modals.forEach(m => { if (!existingModalIds.has(m.id)) state.modals.push(m); });
       if (imported.utang) imported.utang.forEach(u => { if (!existingUtangIds.has(u.id)) state.utang.push(u); });
 
-      // Merge menus & toppings (skip replacing wholesale, so items don't get wiped)
+      // Merge menus & toppings. Match by NAME first (case-insensitive), not just id,
+      // karena tiap HP bikin menu/topping sendiri-sendiri jadi ID-nya beda walau
+      // nama itemnya sama persis. idRemap dipakai supaya data stok yang di-import
+      // (yang nempel ke ID dari HP asal) nyambung ke topping lokal yang sama.
+      const idRemap = {};
       if (imported.menus && imported.menus.length > 0) {
         imported.menus.forEach(im => {
-          const existingMenu = state.menus.find(m => m.id === im.id);
+          const existingMenu = state.menus.find(m => m.id === im.id)
+            || state.menus.find(m => m.name.trim().toLowerCase() === im.name.trim().toLowerCase());
           if (!existingMenu) {
             state.menus.push(im);
           } else {
-            const existingToppingIds = new Set(existingMenu.toppings.map(t => t.id));
             (im.toppings || []).forEach(t => {
-              if (!existingToppingIds.has(t.id)) existingMenu.toppings.push(t);
+              const existingTopping = existingMenu.toppings.find(et => et.id === t.id)
+                || existingMenu.toppings.find(et => et.name.trim().toLowerCase() === t.name.trim().toLowerCase());
+              if (!existingTopping) {
+                existingMenu.toppings.push(t);
+              } else if (existingTopping.id !== t.id) {
+                idRemap[t.id] = existingTopping.id;
+              }
             });
           }
         });
       }
 
-      // Merge stocks (topping stock history)
+      // Merge stocks (topping stock history), pakai idRemap biar nyambung ke topping lokal
       if (imported.stocks) {
-        Object.keys(imported.stocks).forEach(tid => {
-          const importedStock = imported.stocks[tid];
+        Object.keys(imported.stocks).forEach(rawTid => {
+          const tid = idRemap[rawTid] || rawTid;
+          const importedStock = imported.stocks[rawTid];
           if (!state.stocks[tid]) {
             state.stocks[tid] = importedStock;
           } else {
