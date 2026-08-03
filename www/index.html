@@ -653,6 +653,7 @@ function loadState() {
   if (!state.modals) state.modals = [];
   if (!state.stocks) state.stocks = {};
   if (!state.utang) state.utang = [];
+  if (state.lastStokCloseMonth === undefined) state.lastStokCloseMonth = null;
   // Migrate old flat utang structure (1 record = 1 transaction) into grouped-by-name structure
   if (state.utang.length > 0 && state.utang[0].riwayat === undefined) {
     const grouped = {};
@@ -1488,6 +1489,42 @@ function undoStok() {
   renderStok(false);
   toast('↩️ Perubahan stok dibatalkan.');
 }
+function monthKey(date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+}
+
+// Auto tutup-buku bulanan: dipanggil sekali tiap kali app dibuka.
+// Kalau bulan sudah berganti sejak terakhir dicek, semua baseline stok
+// otomatis di-refresh (silent, tanpa konfirmasi) supaya penjualan bulan
+// lalu tidak ikut terhitung "terjual" di bulan baru. Restock manual
+// (submitEditStokSemua) & refresh manual tetap jalan seperti biasa dan
+// tidak terganggu oleh proses ini.
+function autoCloseMonthStokIfNeeded() {
+  const currentKey = monthKey(new Date());
+  if (!state.lastStokCloseMonth) {
+    // Pertama kali fitur ini aktif: cuma catat bulan sekarang, jangan
+    // ganggu baseline yang sudah ada.
+    state.lastStokCloseMonth = currentKey;
+    saveState();
+    return;
+  }
+  if (state.lastStokCloseMonth === currentKey) return; // masih bulan yang sama
+
+  const groups = getToppingGroups().filter(g => !groupIsComposite(g));
+  groups.forEach(g => {
+    const canonicalId = getGroupCanonicalId(g);
+    if (!state.stocks[canonicalId]) state.stocks[canonicalId] = { total: 0, baselineDate: null, riwayat: [] };
+    const stokData = state.stocks[canonicalId];
+    const terjual = getTerjualSince(g.ids, stokData.baselineDate);
+    const sisa = stokData.total - terjual;
+    stokData.total = sisa;
+    stokData.baselineDate = Date.now();
+  });
+  state.lastStokCloseMonth = currentKey;
+  saveState();
+  toast('📅 Laporan modal bulan lalu ditutup, stok disesuaikan untuk bulan ini.');
+}
+
 function refreshBaselineStok() {
   if (!confirm('Refresh baseline? Stok akan disesuaikan ke sisa saat ini, dan "Terjual" mulai dihitung ulang dari 0.')) return;
   saveStokUndoSnapshot();
@@ -2235,6 +2272,7 @@ function closeReminder() {
 // ===== INIT =====
 function init() {
   loadState();
+  autoCloseMonthStokIfNeeded();
 
   // Set default dates
   document.getElementById('filter-date').value = todayStr();
