@@ -653,7 +653,7 @@ function loadState() {
   if (!state.modals) state.modals = [];
   if (!state.stocks) state.stocks = {};
   if (!state.utang) state.utang = [];
-  if (state.lastStokCloseMonth === undefined) state.lastStokCloseMonth = null;
+  if (state.lastStokCloseDate === undefined) state.lastStokCloseDate = null;
   // Migrate old flat utang structure (1 record = 1 transaction) into grouped-by-name structure
   if (state.utang.length > 0 && state.utang[0].riwayat === undefined) {
     const grouped = {};
@@ -1489,26 +1489,22 @@ function undoStok() {
   renderStok(false);
   toast('↩️ Perubahan stok dibatalkan.');
 }
-function monthKey(date) {
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-}
-
-// Auto tutup-buku bulanan: dipanggil sekali tiap kali app dibuka.
-// Kalau bulan sudah berganti sejak terakhir dicek, semua baseline stok
-// otomatis di-refresh (silent, tanpa konfirmasi) supaya penjualan bulan
-// lalu tidak ikut terhitung "terjual" di bulan baru. Restock manual
+// Auto tutup-buku harian: dipanggil sekali tiap kali app dibuka.
+// Kalau tanggal sudah berganti sejak terakhir dicek, semua baseline stok
+// otomatis di-refresh (silent, tanpa konfirmasi) supaya penjualan hari
+// kemarin tidak ikut terhitung "terjual" di hari ini. Restock manual
 // (submitEditStokSemua) & refresh manual tetap jalan seperti biasa dan
 // tidak terganggu oleh proses ini.
-function autoCloseMonthStokIfNeeded() {
-  const currentKey = monthKey(new Date());
-  if (!state.lastStokCloseMonth) {
-    // Pertama kali fitur ini aktif: cuma catat bulan sekarang, jangan
+function autoCloseDayStokIfNeeded() {
+  const currentKey = todayStr();
+  if (!state.lastStokCloseDate) {
+    // Pertama kali fitur ini aktif: cuma catat tanggal sekarang, jangan
     // ganggu baseline yang sudah ada.
-    state.lastStokCloseMonth = currentKey;
+    state.lastStokCloseDate = currentKey;
     saveState();
     return;
   }
-  if (state.lastStokCloseMonth === currentKey) return; // masih bulan yang sama
+  if (state.lastStokCloseDate === currentKey) return; // masih hari yang sama
 
   const groups = getToppingGroups().filter(g => !groupIsComposite(g));
   groups.forEach(g => {
@@ -1520,9 +1516,9 @@ function autoCloseMonthStokIfNeeded() {
     stokData.total = sisa;
     stokData.baselineDate = Date.now();
   });
-  state.lastStokCloseMonth = currentKey;
+  state.lastStokCloseDate = currentKey;
   saveState();
-  toast('📅 Laporan modal bulan lalu ditutup, stok disesuaikan untuk bulan ini.');
+  toast('📅 Laporan modal hari kemarin ditutup, stok awal disesuaikan untuk hari ini.');
 }
 
 function refreshBaselineStok() {
@@ -1597,7 +1593,7 @@ function renderStok(editMode = false) {
               <div style="font-size:14px;font-weight:700;margin-bottom:8px;">${g.name}</div>
               <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;text-align:center;">
                 <div style="background:#f5f5f5;border-radius:8px;padding:8px;">
-                  <div style="font-size:10px;color:var(--gray);margin-bottom:4px;">STOK</div>
+                  <div style="font-size:10px;color:var(--gray);margin-bottom:4px;">STOK AWAL</div>
                   ${editMode
                     ? `<input type="number" id="stok-input-${canonicalId}" value="${stokData.total}" min="0"
                          style="width:100%;border:2px solid var(--primary);border-radius:6px;padding:4px;font-size:16px;font-weight:800;text-align:center;background:#fff;">`
@@ -1609,7 +1605,7 @@ function renderStok(editMode = false) {
                   <div style="font-size:16px;font-weight:800;color:var(--red);">${terjual}</div>
                 </div>
                 <div style="background:#f5f5f5;border-radius:8px;padding:8px;">
-                  <div style="font-size:10px;color:var(--gray);margin-bottom:2px;">SISA</div>
+                  <div style="font-size:10px;color:var(--gray);margin-bottom:2px;">STOK BARANG</div>
                   <div style="font-size:16px;font-weight:800;color:${sisaColor};">${sisa}</div>
                 </div>
               </div>
@@ -1658,7 +1654,7 @@ function openEditStokSemua() {
           const sisa = stokData.total - terjual;
           return `
           <div class="form-group" style="margin-bottom:10px;">
-            <label class="form-label">${g.name} <span style="color:var(--gray);font-weight:400;">(sisa saat ini: ${sisa})</span></label>
+            <label class="form-label">${g.name} <span style="color:var(--gray);font-weight:400;">(stok barang saat ini: ${sisa})</span></label>
             <input type="number" class="form-input" id="restok-input-${canonicalId}" placeholder="0" min="0">
           </div>`;
         }).join('')}
@@ -2272,7 +2268,7 @@ function closeReminder() {
 // ===== INIT =====
 function init() {
   loadState();
-  autoCloseMonthStokIfNeeded();
+  autoCloseDayStokIfNeeded();
 
   // Set default dates
   document.getElementById('filter-date').value = todayStr();
