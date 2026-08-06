@@ -324,6 +324,9 @@
     <button class="btn btn-outline" style="margin-bottom:14px;" onclick="setHarianToday()">📅 Hari Ini</button>
     <div id="harian-stats"></div>
 
+    <div class="section-title">📦 Terjual</div>
+    <div id="harian-terjual-list"></div>
+
     <div class="section-title" style="color:var(--green);">💰 Pemasukan Manual</div>
     <div id="harian-pemasukan-list"></div>
 
@@ -912,11 +915,42 @@ function setHarianToday() {
   document.getElementById('filter-date').value = todayStr();
   renderHarian();
 }
+function renderHarianTerjual(orders) {
+  const counts = {};
+  orders.forEach(o => {
+    o.items.forEach(item => {
+      if (item.toppings.length === 0) {
+        counts[item.menuName] = (counts[item.menuName] || 0) + item.qty;
+      } else {
+        item.toppings.forEach(t => {
+          counts[t.name] = (counts[t.name] || 0) + t.qty;
+        });
+      }
+    });
+  });
+  const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+  const el = document.getElementById('harian-terjual-list');
+  if (sorted.length === 0) {
+    el.innerHTML = '<div style="font-size:12px;color:var(--gray);margin-bottom:12px;">Belum ada barang terjual hari ini.</div>';
+    return;
+  }
+  el.innerHTML = `
+    <div class="card" style="margin-bottom:12px;">
+      ${sorted.map(([name, qty]) => `
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border);font-size:13px;">
+          <span>${name}</span>
+          <span style="font-weight:800;color:var(--accent);">${qty}</span>
+        </div>
+      `).join('')}
+    </div>`;
+}
+
 function renderHarian() {
   const dateEl = document.getElementById('filter-date');
   if (!dateEl.value) dateEl.value = todayStr();
   const date = dateEl.value;
   const orders = state.orders.filter(o => o.date === date);
+  renderHarianTerjual(orders);
 
   // Stats
   const totalBayar = orders.filter(o => o.status === 'bayar').reduce((s, o) => s + o.grandTotal, 0);
@@ -1624,7 +1658,7 @@ function renderStok(editMode = false) {
             return `
             <div class="card stok-item" data-name="${g.name.toLowerCase()}" style="margin-bottom:8px;">
               <div style="font-size:14px;font-weight:700;margin-bottom:8px;">${g.name}</div>
-              <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;text-align:center;">
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;text-align:center;">
                 <div style="background:#f5f5f5;border-radius:8px;padding:8px;">
                   <div style="font-size:10px;color:var(--gray);margin-bottom:4px;">STOK AWAL</div>
                   ${editMode
@@ -1632,10 +1666,6 @@ function renderStok(editMode = false) {
                          style="width:100%;border:2px solid var(--primary);border-radius:6px;padding:4px;font-size:16px;font-weight:800;text-align:center;background:#fff;">`
                     : `<div style="font-size:16px;font-weight:800;">${stokData.total}</div>`
                   }
-                </div>
-                <div style="background:#f5f5f5;border-radius:8px;padding:8px;">
-                  <div style="font-size:10px;color:var(--gray);margin-bottom:2px;">TERJUAL</div>
-                  <div style="font-size:16px;font-weight:800;color:var(--red);">${terjual}</div>
                 </div>
                 <div style="background:#f5f5f5;border-radius:8px;padding:8px;">
                   <div style="font-size:10px;color:var(--gray);margin-bottom:2px;">STOK BARANG</div>
