@@ -1666,8 +1666,27 @@ function filterStokList() {
 }
 
 function simpanEditStok() {
-  saveStokUndoSnapshot();
   const groups = getToppingGroups();
+  const changes = [];
+  groups.forEach(g => {
+    const canonicalId = getGroupCanonicalId(g);
+    const input = document.getElementById(`stok-input-${canonicalId}`);
+    if (!input) return;
+    const val = parseInt(input.value) || 0;
+    const oldVal = (state.stocks[canonicalId] && state.stocks[canonicalId].total) || 0;
+    if (val !== oldVal) changes.push({ name: g.name, oldVal, val });
+  });
+
+  if (changes.length === 0) {
+    renderStok(false);
+    return;
+  }
+
+  const ringkasan = changes.map(c => `• ${c.name}: ${c.oldVal} → ${c.val}`).join('\n');
+  if (!confirm(`Simpan perubahan stok awal berikut?\n\n${ringkasan}`)) return;
+
+  saveStokUndoSnapshot();
+  const cutoff = startOfDayTs();
   groups.forEach(g => {
     const canonicalId = getGroupCanonicalId(g);
     const input = document.getElementById(`stok-input-${canonicalId}`);
@@ -1675,7 +1694,7 @@ function simpanEditStok() {
     const val = parseInt(input.value) || 0;
     if (!state.stocks[canonicalId]) state.stocks[canonicalId] = { total: 0, baselineDate: null, riwayat: [] };
     state.stocks[canonicalId].total = val;
-    state.stocks[canonicalId].baselineDate = Date.now();
+    state.stocks[canonicalId].baselineDate = cutoff;
     // Keep other ids sharing this name in sync at 0 so totals never double-count.
     g.ids.filter(id => id !== canonicalId).forEach(otherId => {
       if (!state.stocks[otherId]) state.stocks[otherId] = { total: 0, baselineDate: null, riwayat: [] };
@@ -1729,22 +1748,27 @@ function filterRestokList() {
 }
 
 function submitEditStokSemua() {
-  saveStokUndoSnapshot();
   const groups = getToppingGroups();
-  let ada = false;
+  const changes = [];
   groups.forEach(g => {
     const canonicalId = getGroupCanonicalId(g);
     const input = document.getElementById(`restok-input-${canonicalId}`);
     if (!input) return;
     const val = parseInt(input.value) || 0;
-    if (val > 0) {
-      const stokData = foldItemToStartOfToday(canonicalId, g.ids);
-      stokData.total = stokData.total + val;
-      stokData.riwayat.push({ date: todayStr(), jumlah: val, catatan: '' });
-      ada = true;
-    }
+    if (val > 0) changes.push({ canonicalId, name: g.name, ids: g.ids, val });
   });
-  if (!ada) { toast('Isi minimal 1 stok topping!'); return; }
+
+  if (changes.length === 0) { toast('Isi minimal 1 stok topping!'); return; }
+
+  const ringkasan = changes.map(c => `• ${c.name}: +${c.val}`).join('\n');
+  if (!confirm(`Tambah stok berikut?\n\n${ringkasan}`)) return;
+
+  saveStokUndoSnapshot();
+  changes.forEach(c => {
+    const stokData = foldItemToStartOfToday(c.canonicalId, c.ids);
+    stokData.total = stokData.total + c.val;
+    stokData.riwayat.push({ date: todayStr(), jumlah: c.val, catatan: '' });
+  });
   saveState();
   closeModal('modal-edit-stok-semua');
   renderStok();
