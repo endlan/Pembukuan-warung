@@ -1467,14 +1467,14 @@ function toTs(v) {
   return isNaN(t) ? null : t;
 }
 
-function getTerjualSince(ids, sinceRaw) {
+function getTerjualSince(ids, sinceRaw, untilRaw) {
   const sinceTs = toTs(sinceRaw);
+  const untilTs = untilRaw != null ? toTs(untilRaw) : null;
   let total = 0;
   state.orders.forEach(o => {
-    if (sinceTs != null) {
-      const orderTs = o.createdAt != null ? o.createdAt : toTs(o.date);
-      if (orderTs != null && orderTs < sinceTs) return;
-    }
+    const orderTs = o.createdAt != null ? o.createdAt : toTs(o.date);
+    if (sinceTs != null && orderTs != null && orderTs < sinceTs) return;
+    if (untilTs != null && orderTs != null && orderTs >= untilTs) return;
     o.items.forEach(item => {
       item.toppings.forEach(t => {
         if (ids.includes(t.id)) {
@@ -1526,30 +1526,44 @@ function autoCloseDayStokIfNeeded() {
   const groups = getToppingGroups().filter(g => !groupIsComposite(g));
   groups.forEach(g => {
     const canonicalId = getGroupCanonicalId(g);
-    if (!state.stocks[canonicalId]) state.stocks[canonicalId] = { total: 0, baselineDate: null, riwayat: [] };
-    const stokData = state.stocks[canonicalId];
-    const terjual = getTerjualSince(g.ids, stokData.baselineDate);
-    const sisa = stokData.total - terjual;
-    stokData.total = sisa;
-    stokData.baselineDate = Date.now();
+    foldItemToStartOfToday(canonicalId, g.ids);
   });
   state.lastStokCloseDate = currentKey;
   saveState();
   toast('📅 Laporan modal hari kemarin ditutup, stok awal disesuaikan untuk hari ini.');
 }
 
+function startOfDayTs(ts) {
+  const d = ts != null ? new Date(ts) : new Date();
+  d.setHours(0, 0, 0, 0);
+  return d.getTime();
+}
+
+// Lipat penjualan SEBELUM hari ini ke stok, dan geser baseline ke jam
+// 00:00 hari ini (bukan ke waktu klik persis) — supaya semua penjualan
+// HARI INI (jam berapapun) tetap kehitung penuh di "terjual", nggak
+// hilang walau baseline di-refresh/direstok di tengah hari. Kalau
+// baseline sudah di hari ini (misal sudah pernah di-refresh/restok hari
+// ini sebelumnya), tidak ada yang perlu dilipat lagi.
+function foldItemToStartOfToday(canonicalId, ids) {
+  const cutoff = startOfDayTs();
+  if (!state.stocks[canonicalId]) state.stocks[canonicalId] = { total: 0, baselineDate: null, riwayat: [] };
+  const stokData = state.stocks[canonicalId];
+  if (!(stokData.baselineDate && stokData.baselineDate >= cutoff)) {
+    const terjualSebelumHariIni = getTerjualSince(ids, stokData.baselineDate, cutoff);
+    stokData.total = stokData.total - terjualSebelumHariIni;
+    stokData.baselineDate = cutoff;
+  }
+  return stokData;
+}
+
 function refreshBaselineStok() {
-  if (!confirm('Refresh baseline? Stok akan disesuaikan ke sisa saat ini, dan "Terjual" mulai dihitung ulang dari 0.')) return;
+  if (!confirm('Refresh baseline? Penjualan sebelum hari ini akan dilipat ke stok. Penjualan hari ini tetap dihitung penuh dari jam 00:00.')) return;
   saveStokUndoSnapshot();
   const groups = getToppingGroups().filter(g => !groupIsComposite(g));
   groups.forEach(g => {
     const canonicalId = getGroupCanonicalId(g);
-    if (!state.stocks[canonicalId]) state.stocks[canonicalId] = { total: 0, baselineDate: null, riwayat: [] };
-    const stokData = state.stocks[canonicalId];
-    const terjual = getTerjualSince(g.ids, stokData.baselineDate);
-    const sisa = stokData.total - terjual;
-    stokData.total = sisa;
-    stokData.baselineDate = Date.now();
+    foldItemToStartOfToday(canonicalId, g.ids);
   });
   saveState();
   renderStok(false);
@@ -1724,12 +1738,8 @@ function submitEditStokSemua() {
     if (!input) return;
     const val = parseInt(input.value) || 0;
     if (val > 0) {
-      if (!state.stocks[canonicalId]) state.stocks[canonicalId] = { total: 0, baselineDate: null, riwayat: [] };
-      const stokData = state.stocks[canonicalId];
-      const terjualSejakBaseline = getTerjualSince(g.ids, stokData.baselineDate);
-      const sisaSekarang = stokData.total - terjualSejakBaseline;
-      stokData.total = sisaSekarang + val;
-      stokData.baselineDate = Date.now();
+      const stokData = foldItemToStartOfToday(canonicalId, g.ids);
+      stokData.total = stokData.total + val;
       stokData.riwayat.push({ date: todayStr(), jumlah: val, catatan: '' });
       ada = true;
     }
