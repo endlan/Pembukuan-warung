@@ -380,6 +380,12 @@
     <button class="btn btn-primary" style="margin-bottom:16px;" onclick="openUtangModal()">💳 Kelola Utang Pelanggan</button>
 
     <div class="section-title">Stok Topping</div>
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+      <button class="btn btn-outline" style="width:auto;padding:11px 16px;" onclick="changeStokDate(-1)">◀</button>
+      <input type="date" class="form-input" id="stok-filter-date" style="flex:1;text-align:center;" onchange="renderStok(false)">
+      <button class="btn btn-outline" style="width:auto;padding:11px 16px;" onclick="changeStokDate(1)">▶</button>
+    </div>
+    <button class="btn btn-outline" style="margin-bottom:14px;" onclick="setStokToday()">📅 Hari Ini</button>
     <div id="stok-list"></div>
 
     <input type="hidden" id="pengeluaran-date">
@@ -673,6 +679,7 @@ function loadState() {
   if (!state.orders) state.orders = [];
   if (!state.modals) state.modals = [];
   if (!state.stocks) state.stocks = {};
+  if (!state.stockHistory) state.stockHistory = {};
   if (!state.utang) state.utang = [];
   if (state.lastStokCloseDate === undefined) state.lastStokCloseDate = null;
   // Migrate old flat utang structure (1 record = 1 transaction) into grouped-by-name structure
@@ -715,6 +722,13 @@ function fmtDateShort(str) {
 }
 function todayStr() {
   const d = new Date();
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+}
+function dateStrFromTs(ts) {
+  const d = new Date(ts);
   const yyyy = d.getFullYear();
   const mm = String(d.getMonth() + 1).padStart(2, '0');
   const dd = String(d.getDate()).padStart(2, '0');
@@ -914,6 +928,23 @@ function submitOrder() {
 }
 
 // ===== REKAP HARIAN =====
+function changeStokDate(delta) {
+  const el = document.getElementById('stok-filter-date');
+  if (!el.value) el.value = todayStr();
+  const d = new Date(el.value + 'T00:00:00');
+  d.setDate(d.getDate() + delta);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  const newVal = `${y}-${m}-${day}`;
+  if (newVal > todayStr()) return; // nggak bisa lihat masa depan
+  el.value = newVal;
+  renderStok(false);
+}
+function setStokToday() {
+  document.getElementById('stok-filter-date').value = todayStr();
+  renderStok(false);
+}
 function changeHarianDate(delta) {
   const el = document.getElementById('filter-date');
   if (!el.value) el.value = todayStr();
@@ -1567,6 +1598,48 @@ function undoStok() {
 // kemarin tidak ikut terhitung "terjual" di hari ini. Restock manual
 // (submitEditStokSemua) & refresh manual tetap jalan seperti biasa dan
 // tidak terganggu oleh proses ini.
+// Sama seperti foldItemToStartOfToday, tapi juga nyimpen snapshot histori
+// (stok awal & stok akhir) buat periode yang baru ditutup, dipakai fitur
+// kalender di halaman Modal. Cuma dipanggil pas beneran ganti hari
+// (bukan pas refresh/restock manual di tengah hari).
+function closeDayAndLogHistory(canonicalId, ids) {
+  const cutoff = startOfDayTs();
+  if (!state.stocks[canonicalId]) state.stocks[canonicalId] = { total: 0, baselineDate: null, riwayat: [] };
+  const stokData = state.stocks[canonicalId];
+  if (stokData.baselineDate && stokData.baselineDate >= cutoff) return; // sudah di hari ini
+
+  if (stokData.baselineDate) {
+    const startDateStr = dateStrFromTs(stokData.baselineDate);
+    const endDateStr = dateStrFromTs(cutoff - 1);
+    const terjual = getTerjualSince(ids, stokData.baselineDate, cutoff);
+    const stokAwal = stokData.total;
+    const stokAkhir = stokData.total - terjual;
+    if (!state.stockHistory[canonicalId]) state.stockHistory[canonicalId] = [];
+    state.stockHistory[canonicalId].push({ startDate: startDateStr, endDate: endDateStr, stokAwal, terjual, stokAkhir });
+    stokData.total = stokAkhir;
+  }
+  stokData.baselineDate = cutoff;
+}
+
+// Cari data stok buat tanggal tertentu. Untuk hari ini, hitung langsung
+// (live). Untuk tanggal lampau, cari dari snapshot histori yang kesimpen
+// pas hari itu ditutup. Kalau nggak ketemu (fitur ini belum aktif waktu
+// itu), return null.
+function getStokForDate(canonicalId, ids, dateStr) {
+  if (dateStr === todayStr()) {
+    const stokData = state.stocks[canonicalId] || { total: 0, baselineDate: null };
+    const terjual = getTerjualSince(ids, stokData.baselineDate);
+    return { stokAwal: stokData.total, terjual, stokAkhir: stokData.total - terjual, isLive: true, rangeNote: null };
+  }
+  const history = state.stockHistory[canonicalId] || [];
+  const rec = history.find(h => h.startDate <= dateStr && dateStr <= h.endDate);
+  if (!rec) return null;
+  return {
+    stokAwal: rec.stokAwal, terjual: rec.terjual, stokAkhir: rec.stokAkhir, isLive: false,
+    rangeNote: rec.startDate !== rec.endDate ? `${fmtDateShort(rec.startDate)} – ${fmtDateShort(rec.endDate)}` : null,
+  };
+}
+
 function autoCloseDayStokIfNeeded() {
   const currentKey = todayStr();
   if (!state.lastStokCloseDate) {
@@ -1581,7 +1654,7 @@ function autoCloseDayStokIfNeeded() {
   const groups = getToppingGroups().filter(g => !groupIsComposite(g));
   groups.forEach(g => {
     const canonicalId = getGroupCanonicalId(g);
-    foldItemToStartOfToday(canonicalId, g.ids);
+    closeDayAndLogHistory(canonicalId, g.ids);
   });
   state.lastStokCloseDate = currentKey;
   saveState();
@@ -1631,12 +1704,20 @@ function renderStok(editMode = false) {
     document.getElementById('stok-list').innerHTML = '<div class="empty"><div class="empty-icon">📦</div>Belum ada topping.</div>';
     return;
   }
+  const dateEl = document.getElementById('stok-filter-date');
+  if (!dateEl.value) dateEl.value = todayStr();
+  const selectedDate = dateEl.value;
+  const isToday = selectedDate === todayStr();
+  if (!isToday) editMode = false; // nggak bisa edit/restock data tanggal lampau
+
   const menus = sortByName(state.menus);
   const prevSearch = document.getElementById('stok-search') ? document.getElementById('stok-search').value : '';
   document.getElementById('stok-list').innerHTML = `
     <input type="text" class="form-input search-input" id="stok-search" placeholder="🔍 Cari barang..." oninput="filterStokList()" value="${prevSearch.replace(/"/g, '&quot;')}" style="margin-bottom:10px;">
     <div style="text-align:right;margin-bottom:8px;">
-      ${editMode
+      ${!isToday
+        ? `<div style="text-align:left;background:#fff7ed;border:1.5px solid var(--accent);border-radius:8px;padding:8px 12px;font-size:12px;font-weight:600;color:var(--accent);">🕓 Menampilkan histori stok — mode edit/restock nggak aktif untuk tanggal lampau.</div>`
+        : editMode
         ? `<button class="btn btn-primary" onclick="simpanEditStok()">💾 Simpan</button>
            <button class="btn btn-outline" style="margin-left:6px;" onclick="renderStok(false)">Batal</button>`
         : `<button class="btn btn-primary" onclick="openEditStokSemua()">📦 Restock</button>
@@ -1672,25 +1753,31 @@ function renderStok(editMode = false) {
               </div>`;
             }
 
-            const stokData = state.stocks[canonicalId] || { total: 0, baselineDate: null, riwayat: [] };
-            const terjual = getTerjualSince(g.ids, stokData.baselineDate);
-            const sisa = stokData.total - terjual;
-            const sisaColor = sisa <= 0 ? '#ff7c7c' : sisa <= 5 ? 'var(--yellow)' : 'var(--green)';
+            const rec = getStokForDate(canonicalId, g.ids, selectedDate);
+            if (!rec) {
+              return `
+              <div class="card stok-item" data-name="${g.name.toLowerCase()}" style="margin-bottom:8px;">
+                <div style="font-size:14px;font-weight:700;margin-bottom:8px;">${g.name}</div>
+                <div style="font-size:12px;color:var(--gray);">Data belum tersedia untuk tanggal ini.</div>
+              </div>`;
+            }
+            const sisaColor = rec.stokAkhir <= 0 ? '#ff7c7c' : rec.stokAkhir <= 5 ? 'var(--yellow)' : 'var(--green)';
             return `
             <div class="card stok-item" data-name="${g.name.toLowerCase()}" style="margin-bottom:8px;">
-              <div style="font-size:14px;font-weight:700;margin-bottom:8px;">${g.name}</div>
+              <div style="font-size:14px;font-weight:700;margin-bottom:4px;">${g.name}</div>
+              ${rec.rangeNote ? `<div style="font-size:10px;color:var(--gray);margin-bottom:6px;">Gabungan ${rec.rangeNote} (app sempat tidak dibuka)</div>` : '<div style="margin-bottom:8px;"></div>'}
               <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;text-align:center;">
                 <div style="background:#f5f5f5;border-radius:8px;padding:8px;">
                   <div style="font-size:10px;color:var(--gray);margin-bottom:4px;">STOK AWAL</div>
                   ${editMode
-                    ? `<input type="number" id="stok-input-${canonicalId}" value="${stokData.total}" min="0"
+                    ? `<input type="number" id="stok-input-${canonicalId}" value="${rec.stokAwal}" min="0"
                          style="width:100%;border:2px solid var(--primary);border-radius:6px;padding:4px;font-size:16px;font-weight:800;text-align:center;background:#fff;">`
-                    : `<div style="font-size:16px;font-weight:800;">${stokData.total}</div>`
+                    : `<div style="font-size:16px;font-weight:800;">${rec.stokAwal}</div>`
                   }
                 </div>
                 <div style="background:#f5f5f5;border-radius:8px;padding:8px;">
                   <div style="font-size:10px;color:var(--gray);margin-bottom:2px;">STOK BARANG</div>
-                  <div style="font-size:16px;font-weight:800;color:${sisaColor};">${sisa}</div>
+                  <div style="font-size:16px;font-weight:800;color:${sisaColor};">${rec.stokAkhir}</div>
                 </div>
               </div>
             </div>`;
