@@ -655,6 +655,7 @@ let state = {
 };
 let currentPayStatus = 'bayar';
 let selectedMenus = {}; // { menuId: { qty, toppings: [toppingId] } }
+let expandedMenus = {}; // { menuId: true } - panel topping kebuka/tertutup, terpisah dari selectedMenus
 
 // ===== LOCALSTORAGE =====
 function saveState() {
@@ -759,27 +760,32 @@ function renderOrderMenuList() {
     return;
   }
   el.innerHTML = sortByName(state.menus).map(m => {
+    const hasToppings = m.toppings && m.toppings.length > 0;
     const sel = selectedMenus[m.id];
-    const isSelected = !!sel;
+    const hasToppingSelected = !!sel && Object.keys(sel.toppings).length > 0;
+    // Untuk menu dengan topping: "termasuk di order" cuma kalau ada topping yang dipilih.
+    // Untuk menu tanpa topping: klik baris = langsung pilih/batal menu itu sendiri (perilaku lama).
+    const included = hasToppings ? hasToppingSelected : !!sel;
+    const isExpanded = hasToppings && !!expandedMenus[m.id];
     const qty = sel ? sel.qty : 1;
     const toppings = sel ? sel.toppings : {}; // { toppingId: qty }
-    const toppingTotal = isSelected ? m.toppings.reduce((s, t) => s + (toppings[t.id] || 0) * t.price, 0) : 0;
-    const hasToppingSelected = isSelected && Object.keys(toppings).length > 0;
+    const toppingTotal = included ? m.toppings.reduce((s, t) => s + (toppings[t.id] || 0) * t.price, 0) : 0;
+    const rowClickHandler = hasToppings ? `toggleMenuExpand('${m.id}')` : `toggleMenu('${m.id}')`;
     return `
     <div>
-      <div class="menu-item ${isSelected ? 'selected' : ''}" onclick="toggleMenu('${m.id}')">
-        <div class="check-circle">${isSelected ? '✓' : ''}</div>
+      <div class="menu-item ${included ? 'selected' : ''}" onclick="${rowClickHandler}">
+        <div class="check-circle">${included ? '✓' : (isExpanded ? '▾' : (hasToppings ? '▸' : ''))}</div>
         <div style="flex:1">
           <div class="menu-name">${m.name}</div>
-          ${isSelected ? (hasToppingSelected ? `<div class="menu-price">${rp(toppingTotal)}</div>` : `<div class="menu-price" style="color:var(--gray);">Rp 0 — pilih topping</div>`) : ''}
+          ${included ? `<div class="menu-price">${rp(toppingTotal)}</div>` : ''}
         </div>
-        ${isSelected ? `<div class="qty-control" onclick="event.stopPropagation()">
+        ${included ? `<div class="qty-control" onclick="event.stopPropagation()">
           <button class="qty-btn" onclick="changeQty('${m.id}',-1)">−</button>
           <span class="qty-val">${qty}</span>
           <button class="qty-btn" onclick="changeQty('${m.id}',1)">+</button>
         </div>` : ''}
       </div>
-      ${isSelected && m.toppings && m.toppings.length > 0 ? `
+      ${isExpanded && hasToppings ? `
       <div class="card" style="margin-top:-6px;border-radius:0 0 10px 10px;padding:10px 14px;">
         <div style="font-size:11px;color:var(--gray);margin-bottom:6px;font-weight:600;">TOPPING</div>
         <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;">
@@ -808,6 +814,11 @@ function renderOrderMenuList() {
   }).join('');
 }
 
+function toggleMenuExpand(id) {
+  expandedMenus[id] = !expandedMenus[id];
+  renderOrderMenuList();
+}
+
 function toggleMenu(id) {
   if (selectedMenus[id]) {
     delete selectedMenus[id];
@@ -824,13 +835,14 @@ function changeQty(id, delta) {
 }
 
 function toggleTopping(menuId, toppingId) {
-  if (!selectedMenus[menuId]) return;
+  if (!selectedMenus[menuId]) selectedMenus[menuId] = { qty: 1, toppings: {} };
   const tops = selectedMenus[menuId].toppings;
   if (tops[toppingId]) {
     delete tops[toppingId];
   } else {
     tops[toppingId] = 1;
   }
+  if (Object.keys(tops).length === 0) delete selectedMenus[menuId];
   renderOrderMenuList();
 }
 
@@ -844,6 +856,7 @@ function changeToppingQty(menuId, toppingId, delta) {
   } else {
     tops[toppingId] = next;
   }
+  if (Object.keys(tops).length === 0) delete selectedMenus[menuId];
   renderOrderMenuList();
 }
 
@@ -893,6 +906,7 @@ function submitOrder() {
   state.orders.push(order);
   saveState();
   selectedMenus = {};
+  expandedMenus = {};
   document.getElementById('order-note').value = '';
   setPayStatus('bayar');
   renderOrderMenuList();
@@ -916,33 +930,40 @@ function setHarianToday() {
   renderHarian();
 }
 function renderHarianTerjual(orders) {
-  const counts = {};
+  const groups = {}; // menuName -> { itemName: qty }
   orders.forEach(o => {
     o.items.forEach(item => {
+      if (!groups[item.menuName]) groups[item.menuName] = {};
       if (item.toppings.length === 0) {
-        counts[item.menuName] = (counts[item.menuName] || 0) + item.qty;
+        groups[item.menuName][item.menuName] = (groups[item.menuName][item.menuName] || 0) + item.qty;
       } else {
         item.toppings.forEach(t => {
-          counts[t.name] = (counts[t.name] || 0) + t.qty;
+          groups[item.menuName][t.name] = (groups[item.menuName][t.name] || 0) + t.qty;
         });
       }
     });
   });
-  const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]);
   const el = document.getElementById('harian-terjual-list');
-  if (sorted.length === 0) {
+  const menuNames = Object.keys(groups).sort((a, b) => a.localeCompare(b));
+  if (menuNames.length === 0) {
     el.innerHTML = '<div style="font-size:12px;color:var(--gray);margin-bottom:12px;">Belum ada barang terjual hari ini.</div>';
     return;
   }
-  el.innerHTML = `
-    <div class="card" style="margin-bottom:12px;">
-      ${sorted.map(([name, qty]) => `
-        <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border);font-size:13px;">
-          <span>${name}</span>
-          <span style="font-weight:800;color:var(--accent);">${qty}</span>
+  el.innerHTML = menuNames.map(menuName => {
+    const items = Object.entries(groups[menuName]).sort((a, b) => b[1] - a[1]);
+    return `
+      <div style="margin-bottom:12px;">
+        <div style="background:var(--dark);color:#fff;font-size:11px;font-weight:800;letter-spacing:1px;text-transform:uppercase;padding:6px 10px;border-radius:8px;margin-bottom:6px;">${menuName}</div>
+        <div class="card">
+          ${items.map(([name, qty]) => `
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border);font-size:13px;">
+              <span>${name}</span>
+              <span style="font-weight:800;color:var(--accent);">${qty}</span>
+            </div>
+          `).join('')}
         </div>
-      `).join('')}
-    </div>`;
+      </div>`;
+  }).join('');
 }
 
 function renderHarian() {
