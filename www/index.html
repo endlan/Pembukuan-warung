@@ -357,6 +357,16 @@
       </select>
     </div>
     <div id="bulanan-stats"></div>
+
+    <div class="section-title">🛒 Belanja Stok</div>
+    <div class="card" style="margin-bottom:14px;">
+      <input type="date" class="form-input" id="belanja-date" style="margin-bottom:8px;">
+      <input type="text" class="form-input" id="belanja-desc" placeholder="Keterangan (misal: belanja topping)" style="margin-bottom:8px;">
+      <input type="number" class="form-input" id="belanja-amount" placeholder="Jumlah (Rp)" style="margin-bottom:8px;">
+      <button class="btn btn-primary" id="belanja-submit-btn" onclick="submitBelanja()">Tambah Belanja</button>
+    </div>
+    <div id="belanja-list"></div>
+
     <div class="section-title">Per Hari</div>
     <div id="bulanan-list"></div>
   </div>
@@ -678,6 +688,7 @@ function loadState() {
   if (!state.toppings) state.toppings = [];
   if (!state.orders) state.orders = [];
   if (!state.modals) state.modals = [];
+  if (!state.belanja) state.belanja = [];
   if (!state.stocks) state.stocks = {};
   if (!state.stockHistory) state.stockHistory = {};
   if (!state.utang) state.utang = [];
@@ -1230,6 +1241,14 @@ function renderBulanan() {
   const totalDikurang = hargaAsliTerjual + totalPengeluaranManual;
   const laba = totalPenjualan + totalPemasukanManual - totalDikurang;
 
+  const allBelanjaBulan = state.belanja.filter(b => {
+    const d = new Date(b.date);
+    return d.getMonth() === month && d.getFullYear() === year;
+  });
+  const belanjaBulan = selectedDay ? allBelanjaBulan.filter(b => b.date === selectedDay) : allBelanjaBulan;
+  const totalBelanja = belanjaBulan.reduce((s,b) => s+b.amount, 0);
+  const sisaModal = hargaAsliTerjual - totalBelanja;
+
   document.getElementById('bulanan-stats').innerHTML = `
     <div class="stat-grid">
       <div class="stat-card"><div class="stat-label">Total Penjualan</div><div class="stat-value" style="color:var(--green)">${rp(totalPenjualan)}</div></div>
@@ -1238,7 +1257,30 @@ function renderBulanan() {
       <div class="stat-card"><div class="stat-label">Pengeluaran Manual</div><div class="stat-value" style="color:var(--red)">${rp(totalPengeluaranManual)}</div></div>
       <div class="stat-card"><div class="stat-label">Pemasukan Manual</div><div class="stat-value" style="color:var(--green)">${rp(totalPemasukanManual)}</div></div>
       <div class="stat-card full"><div class="stat-label">Penghasilan Bersih</div><div class="stat-value" style="color:${laba>=0?'#6ddc6d':'#ff7c7c'};font-size:22px;">${rp(laba)}</div></div>
+      <div class="stat-card"><div class="stat-label">Total Belanja</div><div class="stat-value" style="color:var(--red)">${rp(totalBelanja)}</div></div>
+      <div class="stat-card"><div class="stat-label">Sisa Modal</div><div class="stat-value" style="color:${sisaModal>=0?'#6ddc6d':'#ff7c7c'}">${rp(sisaModal)}</div></div>
     </div>`;
+
+  document.getElementById('belanja-date').value = document.getElementById('belanja-date').value || todayStr();
+  if (belanjaBulan.length === 0) {
+    document.getElementById('belanja-list').innerHTML = '<div style="font-size:12px;color:var(--gray);margin-bottom:14px;">Belum ada belanja stok bulan ini.</div>';
+  } else {
+    document.getElementById('belanja-list').innerHTML = [...belanjaBulan].sort((a,b)=>b.date.localeCompare(a.date)).map(b => `
+      <div class="card" style="margin-bottom:8px;">
+        <div class="card-row">
+          <div>
+            <div style="font-size:13px;font-weight:700;">${b.desc}</div>
+            <div style="font-size:11px;color:var(--gray);margin-top:2px;">${fmtDateShort(b.date)}</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <span style="font-size:15px;font-weight:800;color:var(--red);">${rp(b.amount)}</span>
+            <button class="btn btn-sm btn-edit" onclick="editBelanja('${b.id}')">Edit</button>
+            <button class="btn btn-sm btn-delete" onclick="deleteBelanja('${b.id}')">Hapus</button>
+          </div>
+        </div>
+      </div>
+    `).join('');
+  }
 
   // Group by date (order & pengeluaran manual)
   const groups = {};
@@ -1975,6 +2017,45 @@ function renderModal() {
   `).join('');
 }
 
+let editingBelanjaId = null;
+function submitBelanja() {
+  const date = document.getElementById('belanja-date').value;
+  const desc = document.getElementById('belanja-desc').value;
+  const amount = parseFloat(document.getElementById('belanja-amount').value);
+  if (!date || !desc || !amount) { toast('Semua kolom wajib diisi!'); return; }
+  if (editingBelanjaId) {
+    const idx = state.belanja.findIndex(x => x.id === editingBelanjaId);
+    if (idx >= 0) state.belanja[idx] = { ...state.belanja[idx], date, desc, amount };
+    editingBelanjaId = null;
+    document.getElementById('belanja-submit-btn').textContent = 'Tambah Belanja';
+  } else {
+    state.belanja.push({ id: uid(), date, desc, amount });
+  }
+  saveState();
+  document.getElementById('belanja-date').value = todayStr();
+  document.getElementById('belanja-desc').value = '';
+  document.getElementById('belanja-amount').value = '';
+  renderBulanan();
+  toast('✅ Belanja disimpan!');
+}
+function editBelanja(id) {
+  const b = state.belanja.find(x => x.id === id);
+  if (!b) return;
+  document.getElementById('belanja-date').value = b.date;
+  document.getElementById('belanja-desc').value = b.desc;
+  document.getElementById('belanja-amount').value = b.amount;
+  editingBelanjaId = id;
+  document.getElementById('belanja-submit-btn').textContent = 'Simpan Perubahan';
+  document.getElementById('belanja-desc').scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+function deleteBelanja(id) {
+  if (!confirm('Hapus catatan belanja ini?')) return;
+  state.belanja = state.belanja.filter(x => x.id !== id);
+  saveState();
+  renderBulanan();
+  toast('🗑️ Belanja dihapus.');
+}
+
 let editingModalId = null;
 function submitModal() {
   const date = document.getElementById('pengeluaran-date').value;
@@ -2461,6 +2542,7 @@ function importData(event) {
       state.menus = imported.menus || [];
       state.orders = imported.orders || [];
       state.modals = imported.modals || [];
+      state.belanja = imported.belanja || [];
       state.utang = imported.utang || [];
       state.stocks = imported.stocks || {};
 
