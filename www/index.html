@@ -367,6 +367,15 @@
     </div>
     <div id="belanja-list"></div>
 
+    <div class="section-title" style="color:var(--red);">💸 Pengeluaran Manual</div>
+    <div class="card" style="margin-bottom:14px;">
+      <input type="date" class="form-input" id="pengeluaran-bulanan-date" style="margin-bottom:8px;">
+      <input type="text" class="form-input" id="pengeluaran-bulanan-desc" placeholder="Keterangan (misal: ambil uang pribadi)" style="margin-bottom:8px;">
+      <input type="number" class="form-input" id="pengeluaran-bulanan-amount" placeholder="Jumlah (Rp)" style="margin-bottom:8px;">
+      <button class="btn btn-primary" onclick="submitPengeluaranBulanan()">Tambah Pengeluaran</button>
+    </div>
+    <div id="pengeluaran-manual-list"></div>
+
     <div class="section-title">Per Hari</div>
     <div id="bulanan-list"></div>
   </div>
@@ -1282,6 +1291,28 @@ function renderBulanan() {
     `).join('');
   }
 
+  document.getElementById('pengeluaran-bulanan-date').value = document.getElementById('pengeluaran-bulanan-date').value || todayStr();
+  const pengeluaranManualList = modalsBulan.filter(m => (m.type||'keluar') === 'keluar');
+  if (pengeluaranManualList.length === 0) {
+    document.getElementById('pengeluaran-manual-list').innerHTML = '<div style="font-size:12px;color:var(--gray);margin-bottom:14px;">Belum ada pengeluaran manual bulan ini.</div>';
+  } else {
+    document.getElementById('pengeluaran-manual-list').innerHTML = [...pengeluaranManualList].sort((a,b)=>b.date.localeCompare(a.date)).map(m => `
+      <div class="card" style="margin-bottom:8px;">
+        <div class="card-row">
+          <div>
+            <div style="font-size:13px;font-weight:700;">${m.desc}</div>
+            <div style="font-size:11px;color:var(--gray);margin-top:2px;">${fmtDateShort(m.date)}</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <span style="font-size:15px;font-weight:800;color:var(--red);">${rp(m.amount)}</span>
+            <button class="btn btn-sm btn-edit" onclick="editModal('${m.id}')">Edit</button>
+            <button class="btn btn-sm btn-delete" onclick="deleteModal('${m.id}')">Hapus</button>
+          </div>
+        </div>
+      </div>
+    `).join('');
+  }
+
   // Group by date (order & pengeluaran manual)
   const groups = {};
   orders.forEach(o => {
@@ -2017,6 +2048,20 @@ function renderModal() {
   `).join('');
 }
 
+function submitPengeluaranBulanan() {
+  const date = document.getElementById('pengeluaran-bulanan-date').value;
+  const desc = document.getElementById('pengeluaran-bulanan-desc').value.trim();
+  const amount = parseFloat(document.getElementById('pengeluaran-bulanan-amount').value);
+  if (!date || !desc) { toast('Isi tanggal & keterangan dulu!'); return; }
+  if (!amount || amount <= 0) { toast('Isi jumlah yang valid!'); return; }
+  state.modals.push({ id: uid(), date, desc, amount, type: 'keluar' });
+  saveState();
+  document.getElementById('pengeluaran-bulanan-desc').value = '';
+  document.getElementById('pengeluaran-bulanan-amount').value = '';
+  renderBulanan();
+  toast('✅ Pengeluaran dicatat!');
+}
+
 let editingBelanjaId = null;
 function submitBelanja() {
   const date = document.getElementById('belanja-date').value;
@@ -2102,6 +2147,7 @@ function saveEditModal() {
   closeModal('modal-edit-modal');
   renderModal();
   renderHarian();
+  renderBulanan();
   renderOrderModalLists();
   toast('Data diperbarui!');
 }
@@ -2111,6 +2157,7 @@ function deleteModal(id) {
   saveState();
   renderModal();
   renderHarian();
+  renderBulanan();
   renderOrderModalLists();
   toast('Dihapus.');
 }
