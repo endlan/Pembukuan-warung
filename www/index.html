@@ -262,6 +262,10 @@
     <button class="btn btn-sm btn-edit" onclick="showPage('page-menu-settings')" style="margin-left:auto">⚙️ Menu</button>
   </div>
   <div class="scroll-content">
+    <div class="form-group">
+      <label class="form-label">Tanggal Order</label>
+      <input type="date" class="form-input" id="order-date">
+    </div>
     <div class="section-title">Pilih Menu</div>
     <div id="order-menu-list"></div>
     <div class="section-title">Status Pembayaran</div>
@@ -926,9 +930,10 @@ function submitOrder() {
       totalAsli: toppingAsli * sel.qty,
     };
   });
+  const orderDate = document.getElementById('order-date').value || todayStr();
   const order = {
     id: uid(),
-    date: todayStr(),
+    date: orderDate,
     time: new Date().toLocaleTimeString('id-ID', { hour:'2-digit', minute:'2-digit' }),
     createdAt: Date.now(),
     items,
@@ -938,6 +943,7 @@ function submitOrder() {
     grandAsli: items.reduce((s, i) => s + i.totalAsli, 0),
   };
   state.orders.push(order);
+  recalcStockHistoryForDate(orderDate);
   saveState();
   selectedMenus = {};
   expandedMenus = {};
@@ -1146,7 +1152,8 @@ function submitOrderPengeluaran() {
   const amount = parseFloat(document.getElementById('order-pengeluaran-amount').value);
   if (!desc) { toast('Isi keterangan dulu!'); return; }
   if (!amount || amount <= 0) { toast('Isi jumlah yang valid!'); return; }
-  state.modals.push({ id: uid(), date: todayStr(), desc, amount, type: 'keluar' });
+  const pengeluaranDate = document.getElementById('order-date').value || todayStr();
+  state.modals.push({ id: uid(), date: pengeluaranDate, desc, amount, type: 'keluar' });
   saveState();
   document.getElementById('order-pengeluaran-desc').value = '';
   document.getElementById('order-pengeluaran-amount').value = '';
@@ -1159,7 +1166,8 @@ function submitOrderPemasukan() {
   const amount = parseFloat(document.getElementById('order-pemasukan-amount').value);
   if (!desc) { toast('Isi keterangan dulu!'); return; }
   if (!amount || amount <= 0) { toast('Isi jumlah yang valid!'); return; }
-  state.modals.push({ id: uid(), date: todayStr(), desc, amount, type: 'masuk' });
+  const pemasukanDate = document.getElementById('order-date').value || todayStr();
+  state.modals.push({ id: uid(), date: pemasukanDate, desc, amount, type: 'masuk' });
   saveState();
   document.getElementById('order-pemasukan-desc').value = '';
   document.getElementById('order-pemasukan-amount').value = '';
@@ -1196,7 +1204,10 @@ function saveEditOrder() {
 }
 function deleteOrder(id) {
   if (!confirm('Hapus order ini?')) return;
+  const o = state.orders.find(x => x.id === id);
+  const orderDate = o ? o.date : null;
   state.orders = state.orders.filter(x => x.id !== id);
+  if (orderDate) recalcStockHistoryForDate(orderDate);
   saveState();
   renderHarian();
   toast('Order dihapus.');
@@ -1476,6 +1487,7 @@ function toggleDay(id) {
 function deleteOrderFromBulanan(orderId, date) {
   if (!confirm('Hapus order ini?')) return;
   state.orders = state.orders.filter(x => x.id !== orderId);
+  if (date) recalcStockHistoryForDate(date);
   saveState();
   renderBulanan();
   toast('Order dihapus.');
@@ -1635,13 +1647,26 @@ function toTs(v) {
   const t = new Date(v).getTime();
   return isNaN(t) ? null : t;
 }
+// Konversi string tanggal (YYYY-MM-DD) ke timestamp jam 00:00 waktu lokal,
+// biar selalu selaras dengan startOfDayTs()/baselineDate yang juga pakai
+// waktu lokal. Dipakai supaya perhitungan stok mengikuti TANGGAL yang
+// dipilih user di form, bukan jam sebenarnya order itu diklik/disimpan.
+function dateStrToTs(dateStr) {
+  if (!dateStr) return null;
+  const d = new Date(dateStr + 'T00:00:00');
+  const t = d.getTime();
+  return isNaN(t) ? null : t;
+}
 
 function getTerjualSince(ids, sinceRaw, untilRaw) {
   const sinceTs = toTs(sinceRaw);
   const untilTs = untilRaw != null ? toTs(untilRaw) : null;
   let total = 0;
   state.orders.forEach(o => {
-    const orderTs = o.createdAt != null ? o.createdAt : toTs(o.date);
+    // Pakai tanggal yang dipilih user di form (o.date), bukan createdAt
+    // (jam sebenarnya order disimpan) — supaya order yang "ditanggalkan
+    // mundur" kehitung ke hari yang benar, bukan ke hari ini.
+    const orderTs = dateStrToTs(o.date);
     if (sinceTs != null && orderTs != null && orderTs < sinceTs) return;
     if (untilTs != null && orderTs != null && orderTs >= untilTs) return;
     o.items.forEach(item => {
@@ -1721,6 +1746,34 @@ function getStokForDate(canonicalId, ids, dateStr) {
     stokAwal: rec.stokAwal, terjual: rec.terjual, stokAkhir: rec.stokAkhir, isLive: false,
     rangeNote: rec.startDate !== rec.endDate ? `${fmtDateShort(rec.startDate)} – ${fmtDateShort(rec.endDate)}` : null,
   };
+}
+
+// Dipanggil setelah order ditambah/dihapus dengan tanggal MUNDUR (bukan
+// hari ini). Kalau tanggal itu ternyata sudah kepotong ke snapshot histori
+// yang sudah "ditutup", snapshot itu di-recompute ulang (stok awal periode
+// tetap sama, cuma terjual & stok akhir dikoreksi), lalu selisihnya
+// dipotong/dikembalikan ke stok baseline yang berjalan sekarang. Kalau
+// tanggalnya belum ketutup (masih bagian dari periode live/berjalan),
+// nggak perlu ngapa-ngapain — nanti otomatis kehitung sendiri live.
+function recalcStockHistoryForDate(dateStr) {
+  if (!dateStr || dateStr === todayStr()) return;
+  const dayMs = 24 * 60 * 60 * 1000;
+  const groups = getToppingGroups().filter(g => !groupIsComposite(g));
+  groups.forEach(g => {
+    const canonicalId = getGroupCanonicalId(g);
+    const history = state.stockHistory[canonicalId] || [];
+    const rec = history.find(h => h.startDate <= dateStr && dateStr <= h.endDate);
+    if (!rec) return; // bukan periode yang sudah ditutup, biarkan live yang hitung
+    const sinceTs = dateStrToTs(rec.startDate);
+    const untilTs = dateStrToTs(rec.endDate) + dayMs; // eksklusif, sampai akhir hari endDate
+    const newTerjual = getTerjualSince(g.ids, sinceTs, untilTs);
+    if (newTerjual === rec.terjual) return;
+    const delta = newTerjual - rec.terjual;
+    rec.terjual = newTerjual;
+    rec.stokAkhir = rec.stokAwal - newTerjual;
+    if (!state.stocks[canonicalId]) state.stocks[canonicalId] = { total: 0, baselineDate: null, riwayat: [] };
+    state.stocks[canonicalId].total -= delta;
+  });
 }
 
 function autoCloseDayStokIfNeeded() {
@@ -2635,6 +2688,7 @@ function init() {
   // Set default dates
   document.getElementById('filter-date').value = todayStr();
   document.getElementById('pengeluaran-date').value = todayStr();
+  document.getElementById('order-date').value = todayStr();
 
   // Init month/year filters
   const now = new Date();
