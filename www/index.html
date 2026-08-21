@@ -1061,8 +1061,8 @@ function renderHarian() {
   const totalGratis = orders.filter(o => o.status === 'gratis').reduce((s, o) => s + o.grandTotal, 0);
   const totalPenjualan = totalBayar + totalGratis;
   const hargaAsliTerjual = orders.reduce((s, o) => s + (o.grandAsli||0), 0);
-  const pengeluaranManual = state.modals.filter(m => m.date === date && (m.type||'keluar') === 'keluar').reduce((s, m) => s + m.amount, 0);
-  const pemasukanManual = state.modals.filter(m => m.date === date && m.type === 'masuk').reduce((s, m) => s + m.amount, 0);
+  const pengeluaranManual = state.modals.filter(m => m.date === date && (m.type||'keluar') === 'keluar' && (m.scope||'harian') === 'harian').reduce((s, m) => s + m.amount, 0);
+  const pemasukanManual = state.modals.filter(m => m.date === date && m.type === 'masuk' && (m.scope||'harian') === 'harian').reduce((s, m) => s + m.amount, 0);
   const totalDikurang = hargaAsliTerjual + pengeluaranManual;
   const bersih = totalBayar + pemasukanManual - totalDikurang;
 
@@ -1097,12 +1097,12 @@ function renderHarian() {
       </div>
     </div>`;
 
-  const pemasukanList = state.modals.filter(m => m.date === date && m.type === 'masuk');
+  const pemasukanList = state.modals.filter(m => m.date === date && m.type === 'masuk' && (m.scope||'harian') === 'harian');
   document.getElementById('harian-pemasukan-list').innerHTML = pemasukanList.length === 0
     ? '<div style="font-size:12px;color:var(--gray);margin-bottom:12px;">Belum ada pemasukan manual hari ini.</div>'
     : pemasukanList.map(m => renderManualItem(m, 'var(--green)')).join('');
 
-  const pengeluaranList = state.modals.filter(m => m.date === date && (m.type||'keluar') === 'keluar');
+  const pengeluaranList = state.modals.filter(m => m.date === date && (m.type||'keluar') === 'keluar' && (m.scope||'harian') === 'harian');
   document.getElementById('harian-pengeluaran-list').innerHTML = pengeluaranList.length === 0
     ? '<div style="font-size:12px;color:var(--gray);margin-bottom:12px;">Belum ada pengeluaran manual hari ini.</div>'
     : pengeluaranList.map(m => renderManualItem(m, 'var(--red)')).join('');
@@ -1169,7 +1169,7 @@ function submitOrderPengeluaran() {
   if (!desc) { toast('Isi keterangan dulu!'); return; }
   if (!amount || amount <= 0) { toast('Isi jumlah yang valid!'); return; }
   const pengeluaranDate = document.getElementById('order-date').value || todayStr();
-  state.modals.push({ id: uid(), date: pengeluaranDate, desc, amount, type: 'keluar' });
+  state.modals.push({ id: uid(), date: pengeluaranDate, desc, amount, type: 'keluar', scope: 'harian' });
   saveState();
   document.getElementById('order-pengeluaran-desc').value = '';
   document.getElementById('order-pengeluaran-amount').value = '';
@@ -1183,7 +1183,7 @@ function submitOrderPemasukan() {
   if (!desc) { toast('Isi keterangan dulu!'); return; }
   if (!amount || amount <= 0) { toast('Isi jumlah yang valid!'); return; }
   const pemasukanDate = document.getElementById('order-date').value || todayStr();
-  state.modals.push({ id: uid(), date: pemasukanDate, desc, amount, type: 'masuk' });
+  state.modals.push({ id: uid(), date: pemasukanDate, desc, amount, type: 'masuk', scope: 'harian' });
   saveState();
   document.getElementById('order-pemasukan-desc').value = '';
   document.getElementById('order-pemasukan-amount').value = '';
@@ -1416,7 +1416,10 @@ function renderBulanan() {
     const dayOrders = dayData.orders;
     const dayModals = dayData.modals;
     // Untuk bagian detail, batasi sesuai filter yang aktif (header tetap pakai data lengkap di bawah)
-    const displayOrders = bulananFilter === 'gratis' ? dayOrders.filter(o => o.status === 'gratis') : dayOrders;
+    // Saat filter pengeluaran/pemasukan aktif, sembunyikan section order (fokus ke transaksi manual saja)
+    const displayOrders = bulananFilter === 'gratis' ? dayOrders.filter(o => o.status === 'gratis')
+      : (bulananFilter === 'pengeluaran' || bulananFilter === 'pemasukan') ? []
+      : dayOrders;
     const dayPengeluaranManualAll = dayModals.filter(m => (m.type||'keluar')==='keluar');
     const dayPemasukanManualAll = dayModals.filter(m => m.type==='masuk');
     const dayPengeluaranManual = (bulananFilter === 'semua' || bulananFilter === 'pengeluaran') ? dayPengeluaranManualAll : [];
@@ -2182,7 +2185,7 @@ function submitPengeluaranBulanan() {
   const amount = parseFloat(document.getElementById('pengeluaran-bulanan-amount').value);
   if (!date || !desc) { toast('Isi tanggal & keterangan dulu!'); return; }
   if (!amount || amount <= 0) { toast('Isi jumlah yang valid!'); return; }
-  state.modals.push({ id: uid(), date, desc, amount, type: 'keluar' });
+  state.modals.push({ id: uid(), date, desc, amount, type: 'keluar', scope: 'bulanan' });
   saveState();
   document.getElementById('pengeluaran-bulanan-desc').value = '';
   document.getElementById('pengeluaran-bulanan-amount').value = '';
