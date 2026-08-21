@@ -121,6 +121,8 @@
   .badge-red { background:var(--red-bg); color:var(--red); }
   .badge-yellow { background:var(--yellow-bg); color:var(--yellow); }
   .badge-gray { background:var(--muted-bg); color:var(--gray); }
+  .filter-chip { flex:0 0 auto; padding:7px 13px; border-radius:20px; font-size:12px; font-weight:700; border:1.5px solid var(--border); background:var(--card,#fff); color:var(--gray); cursor:pointer; white-space:nowrap; }
+  .filter-chip.active { background:var(--dark); color:#fff; border-color:var(--dark); }
 
   /* Section title */
   .section-title { font-size:11px; color:var(--gray); text-transform:uppercase; letter-spacing:1.5px; font-weight:700; margin:18px 0 8px; }
@@ -381,6 +383,12 @@
     <div id="pengeluaran-manual-list"></div>
 
     <div class="section-title">Per Hari</div>
+    <div id="bulanan-filter-chips" style="display:flex;gap:6px;overflow-x:auto;margin-bottom:10px;padding-bottom:2px;">
+      <button class="filter-chip active" data-filter="semua" onclick="setBulananFilter('semua')">Semua</button>
+      <button class="filter-chip" data-filter="gratis" onclick="setBulananFilter('gratis')">🎁 Gratis</button>
+      <button class="filter-chip" data-filter="pengeluaran" onclick="setBulananFilter('pengeluaran')">💸 Pengeluaran</button>
+      <button class="filter-chip" data-filter="pemasukan" onclick="setBulananFilter('pemasukan')">💰 Pemasukan</button>
+    </div>
     <div id="bulanan-list"></div>
   </div>
 </div>
@@ -1225,6 +1233,15 @@ function initMonthYearFilter(monthId, yearId, renderFn) {
   yEl.innerHTML = years.map(y => `<option value="${y}" ${y===now.getFullYear()?'selected':''}>${y}</option>`).join('');
 }
 
+let bulananFilter = 'semua';
+function setBulananFilter(f) {
+  bulananFilter = f;
+  document.querySelectorAll('#bulanan-filter-chips .filter-chip').forEach(el => {
+    el.classList.toggle('active', el.dataset.filter === f);
+  });
+  renderBulanan();
+}
+
 function renderBulanan() {
   const month = +document.getElementById('filter-month').value;
   const year = +document.getElementById('filter-year').value;
@@ -1358,20 +1375,36 @@ function renderBulanan() {
     if (!groups[m.date]) groups[m.date] = { orders: [], modals: [] };
     groups[m.date].modals.push(m);
   });
-  const sorted = Object.entries(groups).sort((a,b) => b[0].localeCompare(a[0]));
+  let sorted = Object.entries(groups).sort((a,b) => b[0].localeCompare(a[0]));
+
+  // Terapkan filter chip: hanya tampilkan hari yang punya data sesuai filter
+  if (bulananFilter !== 'semua') {
+    sorted = sorted.filter(([date, dayData]) => {
+      if (bulananFilter === 'gratis') return dayData.orders.some(o => o.status === 'gratis');
+      if (bulananFilter === 'pengeluaran') return dayData.modals.some(m => (m.type||'keluar') === 'keluar');
+      if (bulananFilter === 'pemasukan') return dayData.modals.some(m => m.type === 'masuk');
+      return true;
+    });
+  }
 
   if (sorted.length === 0) {
-    document.getElementById('bulanan-list').innerHTML = '<div class="empty"><div class="empty-icon">📆</div>Belum ada data bulan ini.</div>';
+    const emptyMsg = bulananFilter === 'semua' ? 'Belum ada data bulan ini.' : 'Tidak ada data yang cocok dengan filter ini.';
+    document.getElementById('bulanan-list').innerHTML = `<div class="empty"><div class="empty-icon">📆</div>${emptyMsg}</div>`;
     return;
   }
 
   document.getElementById('bulanan-list').innerHTML = sorted.map(([date, dayData]) => {
+    // Ringkasan header tetap pakai data lengkap hari itu (bukan hasil filter)
     const dayOrders = dayData.orders;
     const dayModals = dayData.modals;
-    const dayPengeluaranManual = dayModals.filter(m => (m.type||'keluar')==='keluar');
-    const dayPemasukanManual = dayModals.filter(m => m.type==='masuk');
-    const dayPengeluaranTotal = dayPengeluaranManual.reduce((s,m)=>s+m.amount,0);
-    const dayPemasukanTotal = dayPemasukanManual.reduce((s,m)=>s+m.amount,0);
+    // Untuk bagian detail, batasi sesuai filter yang aktif (header tetap pakai data lengkap di bawah)
+    const displayOrders = bulananFilter === 'gratis' ? dayOrders.filter(o => o.status === 'gratis') : dayOrders;
+    const dayPengeluaranManualAll = dayModals.filter(m => (m.type||'keluar')==='keluar');
+    const dayPemasukanManualAll = dayModals.filter(m => m.type==='masuk');
+    const dayPengeluaranManual = (bulananFilter === 'semua' || bulananFilter === 'pengeluaran') ? dayPengeluaranManualAll : [];
+    const dayPemasukanManual = (bulananFilter === 'semua' || bulananFilter === 'pemasukan') ? dayPemasukanManualAll : [];
+    const dayPengeluaranTotal = dayPengeluaranManualAll.reduce((s,m)=>s+m.amount,0);
+    const dayPemasukanTotal = dayPemasukanManualAll.reduce((s,m)=>s+m.amount,0);
     const dayBayarOrders = dayOrders.filter(o=>o.status==='bayar');
     const dayGratisOrders = dayOrders.filter(o=>o.status==='gratis');
     const dayTotal = dayBayarOrders.reduce((s,o)=>s+o.grandTotal,0);
@@ -1414,12 +1447,12 @@ function renderBulanan() {
         <div style="text-align:right;font-size:13px;font-weight:700;margin-top:6px;">${rp(o.grandTotal)}</div>
       </div>`;
 
-    const bayarOrders = dayOrders.filter(o => o.status === 'bayar');
-    const gratisOrders = dayOrders.filter(o => o.status === 'gratis');
+    const bayarOrders = displayOrders.filter(o => o.status === 'bayar');
+    const gratisOrders = displayOrders.filter(o => o.status === 'gratis');
 
     return `
     <div class="day-group">
-      <div class="day-header" onclick="toggleDay('${id}')">
+      <div class="day-header ${bulananFilter!=='semua'?'open':''}" onclick="toggleDay('${id}')">
         <div>
           <div style="font-weight:700;font-size:14px;">${fmtDate(date)}</div>
           <div style="font-size:11px;color:var(--gray);margin-top:2px;">${dayOrders.length} order · Gratis ${rp(dayGratis)}${dayPengeluaranTotal>0?` · Pengeluaran ${rp(dayPengeluaranTotal)}`:''}${dayPemasukanTotal>0?` · Pemasukan ${rp(dayPemasukanTotal)}`:''}</div>
@@ -1430,7 +1463,7 @@ function renderBulanan() {
           <div style="font-size:11px;color:var(--gray);">▼</div>
         </div>
       </div>
-      <div class="day-content" id="${id}">
+      <div class="day-content ${bulananFilter!=='semua'?'open':''}" id="${id}">
         <div style="font-size:11px;font-weight:700;color:var(--gray);margin-bottom:4px;letter-spacing:0.5px;">RINGKASAN</div>
         ${itemAggRows || '<div style="font-size:12px;color:var(--gray);padding:3px 0;">Tidak ada barang terjual.</div>'}
         <div style="border-top:1px solid var(--border,#e5e5e5);margin-top:6px;padding-top:6px;display:flex;justify-content:space-between;font-size:13px;font-weight:700;">
@@ -1448,14 +1481,14 @@ function renderBulanan() {
 
         <button class="btn btn-sm" style="width:100%;margin-top:10px;" onclick="toggleDay('${detailId}')">Lihat detail order</button>
 
-        <div class="day-content" id="${detailId}" style="margin-top:8px;border-top:none;">
-          ${dayBayarOrders.length > 0 ? `
-            <div style="font-size:11px;font-weight:700;color:var(--green);margin-bottom:4px;letter-spacing:0.5px;">✅ BAYAR (${dayBayarOrders.length} order)</div>
-            ${dayBayarOrders.map(renderOrderItem).join('')}
+        <div class="day-content ${bulananFilter!=='semua'?'open':''}" id="${detailId}" style="margin-top:8px;border-top:none;">
+          ${bayarOrders.length > 0 ? `
+            <div style="font-size:11px;font-weight:700;color:var(--green);margin-bottom:4px;letter-spacing:0.5px;">✅ BAYAR (${bayarOrders.length} order)</div>
+            ${bayarOrders.map(renderOrderItem).join('')}
           ` : ''}
-          ${dayGratisOrders.length > 0 ? `
-            <div style="font-size:11px;font-weight:700;color:var(--yellow);margin-top:6px;margin-bottom:4px;letter-spacing:0.5px;">🎁 GRATIS (${dayGratisOrders.length} order)</div>
-            ${dayGratisOrders.map(renderOrderItem).join('')}
+          ${gratisOrders.length > 0 ? `
+            <div style="font-size:11px;font-weight:700;color:var(--yellow);margin-top:6px;margin-bottom:4px;letter-spacing:0.5px;">🎁 GRATIS (${gratisOrders.length} order)</div>
+            ${gratisOrders.map(renderOrderItem).join('')}
           ` : ''}
           ${dayPengeluaranManual.length > 0 ? `
             <div style="font-size:11px;font-weight:700;color:var(--red);margin-top:6px;margin-bottom:4px;letter-spacing:0.5px;">💸 PENGELUARAN MANUAL (${dayPengeluaranManual.length})</div>
