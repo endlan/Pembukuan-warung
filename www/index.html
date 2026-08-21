@@ -371,7 +371,11 @@
       <input type="number" class="form-input" id="belanja-amount" placeholder="Jumlah (Rp)" style="margin-bottom:8px;">
       <button class="btn btn-primary" id="belanja-submit-btn" onclick="submitBelanja()">Tambah Belanja</button>
     </div>
-    <div id="belanja-list"></div>
+    <div class="card" style="margin-bottom:0;display:flex;justify-content:space-between;align-items:center;cursor:pointer;padding:12px 14px;" onclick="toggleBelanjaList()">
+      <span id="belanja-list-toggle-label" style="font-size:13px;font-weight:700;">📋 Lihat Riwayat Belanja</span>
+      <span id="belanja-list-chevron" style="color:var(--gray);font-size:12px;">▾</span>
+    </div>
+    <div id="belanja-list" style="display:none;margin-top:8px;margin-bottom:14px;"></div>
 
     <div class="section-title" style="color:var(--red);">💸 Pengeluaran Manual</div>
     <div class="card" style="margin-bottom:14px;">
@@ -380,7 +384,11 @@
       <input type="number" class="form-input" id="pengeluaran-bulanan-amount" placeholder="Jumlah (Rp)" style="margin-bottom:8px;">
       <button class="btn btn-primary" onclick="submitPengeluaranBulanan()">Tambah Pengeluaran</button>
     </div>
-    <div id="pengeluaran-manual-list"></div>
+    <div class="card" style="margin-bottom:0;display:flex;justify-content:space-between;align-items:center;cursor:pointer;padding:12px 14px;" onclick="togglePengeluaranManualList()">
+      <span id="pengeluaran-manual-list-toggle-label" style="font-size:13px;font-weight:700;">📋 Lihat Riwayat Pengeluaran</span>
+      <span id="pengeluaran-manual-list-chevron" style="color:var(--gray);font-size:12px;">▾</span>
+    </div>
+    <div id="pengeluaran-manual-list" style="display:none;margin-top:8px;margin-bottom:14px;"></div>
 
     <div class="section-title">Per Hari</div>
     <div id="bulanan-filter-chips" style="display:flex;gap:6px;overflow-x:auto;margin-bottom:10px;padding-bottom:2px;">
@@ -1323,8 +1331,12 @@ function renderBulanan() {
   }
 
   document.getElementById('belanja-date').value = document.getElementById('belanja-date').value || todayStr();
+  const belanjaListOpen = document.getElementById('belanja-list').style.display === 'block';
+  document.getElementById('belanja-list-toggle-label').textContent = belanjaBulan.length > 0
+    ? `📋 Riwayat Belanja (${belanjaBulan.length}) — ${rp(totalBelanja)}`
+    : '📋 Riwayat Belanja';
   if (belanjaBulan.length === 0) {
-    document.getElementById('belanja-list').innerHTML = '<div style="font-size:12px;color:var(--gray);margin-bottom:14px;">Belum ada belanja stok bulan ini.</div>';
+    document.getElementById('belanja-list').innerHTML = '<div style="font-size:12px;color:var(--gray);">Belum ada belanja stok bulan ini.</div>';
   } else {
     document.getElementById('belanja-list').innerHTML = [...belanjaBulan].sort((a,b)=>b.date.localeCompare(a.date)).map(b => `
       <div class="card" style="margin-bottom:8px;">
@@ -1342,11 +1354,16 @@ function renderBulanan() {
       </div>
     `).join('');
   }
+  if (belanjaListOpen) document.getElementById('belanja-list').style.display = 'block';
 
   document.getElementById('pengeluaran-bulanan-date').value = document.getElementById('pengeluaran-bulanan-date').value || todayStr();
   const pengeluaranManualList = modalsBulan.filter(m => (m.type||'keluar') === 'keluar');
+  const pengeluaranListOpen = document.getElementById('pengeluaran-manual-list').style.display === 'block';
+  document.getElementById('pengeluaran-manual-list-toggle-label').textContent = pengeluaranManualList.length > 0
+    ? `📋 Riwayat Pengeluaran (${pengeluaranManualList.length}) — ${rp(totalPengeluaranManual)}`
+    : '📋 Riwayat Pengeluaran';
   if (pengeluaranManualList.length === 0) {
-    document.getElementById('pengeluaran-manual-list').innerHTML = '<div style="font-size:12px;color:var(--gray);margin-bottom:14px;">Belum ada pengeluaran manual bulan ini.</div>';
+    document.getElementById('pengeluaran-manual-list').innerHTML = '<div style="font-size:12px;color:var(--gray);">Belum ada pengeluaran manual bulan ini.</div>';
   } else {
     document.getElementById('pengeluaran-manual-list').innerHTML = [...pengeluaranManualList].sort((a,b)=>b.date.localeCompare(a.date)).map(m => `
       <div class="card" style="margin-bottom:8px;">
@@ -1364,6 +1381,7 @@ function renderBulanan() {
       </div>
     `).join('');
   }
+  if (pengeluaranListOpen) document.getElementById('pengeluaran-manual-list').style.display = 'block';
 
   // Group by date (order & pengeluaran manual)
   const groups = {};
@@ -2295,6 +2313,24 @@ function renderUtangSummary() {
 function toggleBulananRincian() {
   const el = document.getElementById('bulanan-rincian');
   const chevron = document.getElementById('bulanan-rincian-chevron');
+  if (!el) return;
+  const showing = el.style.display !== 'none';
+  el.style.display = showing ? 'none' : 'block';
+  if (chevron) chevron.textContent = showing ? '▾' : '▴';
+}
+
+function toggleBelanjaList() {
+  const el = document.getElementById('belanja-list');
+  const chevron = document.getElementById('belanja-list-chevron');
+  if (!el) return;
+  const showing = el.style.display !== 'none';
+  el.style.display = showing ? 'none' : 'block';
+  if (chevron) chevron.textContent = showing ? '▾' : '▴';
+}
+
+function togglePengeluaranManualList() {
+  const el = document.getElementById('pengeluaran-manual-list');
+  const chevron = document.getElementById('pengeluaran-manual-list-chevron');
   if (!el) return;
   const showing = el.style.display !== 'none';
   el.style.display = showing ? 'none' : 'block';
