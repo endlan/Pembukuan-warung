@@ -1268,18 +1268,42 @@ function renderBulanan() {
   const belanjaBulan = selectedDay ? allBelanjaBulan.filter(b => b.date === selectedDay) : allBelanjaBulan;
   const totalBelanja = belanjaBulan.reduce((s,b) => s+b.amount, 0);
   const sisaModal = hargaAsliTerjual - totalBelanja;
+  const uangAda = laba + sisaModal;
+
+  const rincianEl = document.getElementById('bulanan-rincian');
+  const wasOpen = rincianEl ? rincianEl.style.display === 'block' : false;
 
   document.getElementById('bulanan-stats').innerHTML = `
+    <div style="border-radius:16px;padding:18px;margin-bottom:10px;background:var(--dark);color:#fff;">
+      <div style="font-size:11px;color:#c9c9cc;text-transform:uppercase;letter-spacing:1px;font-weight:700;">💰 Uang Ada</div>
+      <div style="font-size:26px;font-weight:800;margin-top:4px;color:${uangAda>=0?'#6ddc6d':'#ff7c7c'};">${rp(uangAda)}</div>
+      <div style="font-size:11px;color:#9a9a9e;margin-top:6px;">Penghasilan Bersih ${rp(laba)} ${sisaModal>=0?'+':'−'} Sisa Modal ${rp(Math.abs(sisaModal))}</div>
+    </div>
     <div class="stat-grid">
       <div class="stat-card"><div class="stat-label">Total Penjualan</div><div class="stat-value" style="color:var(--green)">${rp(totalPenjualan)}</div></div>
-      <div class="stat-card"><div class="stat-label">Total Gratis</div><div class="stat-value" style="color:var(--yellow)">${rp(totalGratis)}</div></div>
-      <div class="stat-card"><div class="stat-label">Modal Terjual</div><div class="stat-value" style="color:var(--red)">${rp(hargaAsliTerjual)}</div></div>
-      <div class="stat-card"><div class="stat-label">Pengeluaran Manual</div><div class="stat-value" style="color:var(--red)">${rp(totalPengeluaranManual)}</div></div>
-      <div class="stat-card"><div class="stat-label">Pemasukan Manual</div><div class="stat-value" style="color:var(--green)">${rp(totalPemasukanManual)}</div></div>
-      <div class="stat-card full"><div class="stat-label">Penghasilan Bersih</div><div class="stat-value" style="color:${laba>=0?'#6ddc6d':'#ff7c7c'};font-size:22px;">${rp(laba)}</div></div>
-      <div class="stat-card"><div class="stat-label">Total Belanja</div><div class="stat-value" style="color:var(--red)">${rp(totalBelanja)}</div></div>
-      <div class="stat-card"><div class="stat-label">Sisa Modal</div><div class="stat-value" style="color:${sisaModal>=0?'#6ddc6d':'#ff7c7c'}">${rp(sisaModal)}</div></div>
+      <div class="stat-card"><div class="stat-label">Penghasilan Bersih</div><div class="stat-value" style="color:${laba>=0?'var(--green)':'var(--red)'}">${rp(laba)}</div></div>
+    </div>
+    <div class="card" style="margin-top:8px;margin-bottom:0;display:flex;justify-content:space-between;align-items:center;cursor:pointer;padding:12px 14px;" onclick="toggleBulananRincian()">
+      <span style="font-size:13px;font-weight:700;">📋 Lihat Rincian Perhitungan</span>
+      <span id="bulanan-rincian-chevron" style="color:var(--gray);font-size:12px;">▾</span>
+    </div>
+    <div id="bulanan-rincian" style="display:none;margin-top:8px;">
+      <div class="stat-grid">
+        <div class="stat-card"><div class="stat-label">Total Gratis</div><div class="stat-value" style="color:var(--yellow)">${rp(totalGratis)}</div></div>
+        <div class="stat-card"><div class="stat-label">Modal Terjual</div><div class="stat-value" style="color:var(--red)">${rp(hargaAsliTerjual)}</div></div>
+        <div class="stat-card"><div class="stat-label">Pengeluaran Manual</div><div class="stat-value" style="color:var(--red)">${rp(totalPengeluaranManual)}</div></div>
+        <div class="stat-card"><div class="stat-label">Pemasukan Manual</div><div class="stat-value" style="color:var(--green)">${rp(totalPemasukanManual)}</div></div>
+        <div class="stat-card"><div class="stat-label">Total Belanja</div><div class="stat-value" style="color:var(--red)">${rp(totalBelanja)}</div></div>
+        <div class="stat-card"><div class="stat-label">Sisa Modal</div><div class="stat-value" style="color:${sisaModal>=0?'#2e7d32':'#c62828'}">${rp(sisaModal)}</div></div>
+      </div>
     </div>`;
+
+  if (wasOpen) {
+    const newRincianEl = document.getElementById('bulanan-rincian');
+    const chevron = document.getElementById('bulanan-rincian-chevron');
+    if (newRincianEl) newRincianEl.style.display = 'block';
+    if (chevron) chevron.textContent = '▴';
+  }
 
   document.getElementById('belanja-date').value = document.getElementById('belanja-date').value || todayStr();
   if (belanjaBulan.length === 0) {
@@ -2233,6 +2257,15 @@ function renderUtangSummary() {
       </div>
     </div>`;
   renderUtangQuickList();
+}
+
+function toggleBulananRincian() {
+  const el = document.getElementById('bulanan-rincian');
+  const chevron = document.getElementById('bulanan-rincian-chevron');
+  if (!el) return;
+  const showing = el.style.display !== 'none';
+  el.style.display = showing ? 'none' : 'block';
+  if (chevron) chevron.textContent = showing ? '▾' : '▴';
 }
 
 function toggleUtangQuickList() {
