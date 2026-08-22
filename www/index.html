@@ -1066,24 +1066,45 @@ function renderHarian() {
   const totalDikurang = hargaAsliTerjual + pengeluaranManual;
   const bersih = totalBayar + pemasukanManual - totalDikurang;
 
+  const uangDiLaci = bersih + hargaAsliTerjual;
+
+  const harianRincianEl = document.getElementById('harian-rincian');
+  const harianRincianOpen = harianRincianEl ? harianRincianEl.style.display === 'block' : false;
+
   document.getElementById('harian-stats').innerHTML = `
-    <div class="stat-grid">
-      <div class="stat-card full"><div class="stat-label">Total Penjualan <span style="font-size:10px;color:var(--gray);font-weight:400;">(termasuk gratis ${rp(totalGratis)})</span></div><div class="stat-value" style="color:var(--green)">${rp(totalPenjualan)}</div></div>
+    <div style="border-radius:16px;padding:18px;margin-bottom:10px;background:var(--dark);color:#fff;">
+      <div style="font-size:11px;color:#c9c9cc;text-transform:uppercase;letter-spacing:1px;font-weight:700;">💰 Uang di Laci</div>
+      <div style="font-size:26px;font-weight:800;margin-top:4px;color:${uangDiLaci>=0?'#6ddc6d':'#ff7c7c'};">${rp(uangDiLaci)}</div>
+      <div style="font-size:11px;color:#9a9a9e;margin-top:6px;">Penghasilan Bersih ${rp(bersih)} + Modal Terjual ${rp(hargaAsliTerjual)}</div>
     </div>
-    <div style="display:flex;gap:10px;margin-bottom:10px;">
-      <div style="flex:1;display:flex;flex-direction:column;gap:10px;">
+    <div class="card" style="margin-bottom:0;display:flex;justify-content:space-between;align-items:center;cursor:pointer;padding:12px 14px;" onclick="toggleHarianRincian()">
+      <span style="font-size:13px;font-weight:700;">📋 Lihat Rincian Perhitungan</span>
+      <span id="harian-rincian-chevron" style="color:var(--gray);font-size:12px;">▾</span>
+    </div>
+    <div id="harian-rincian" style="display:none;margin-top:8px;">
+      <div class="stat-grid">
+        <div class="stat-card"><div class="stat-label">Total Penjualan <span style="font-size:10px;color:var(--gray);font-weight:400;">(termasuk gratis ${rp(totalGratis)})</span></div><div class="stat-value" style="color:var(--green)">${rp(totalPenjualan)}</div></div>
         <div class="stat-card"><div class="stat-label">Total Bayar</div><div class="stat-value" style="color:var(--green)">${rp(totalBayar)}</div></div>
-        <div class="stat-card"><div class="stat-label">Pemasukan Manual</div><div class="stat-value" style="color:var(--green)">${rp(pemasukanManual)}</div></div>
       </div>
-      <div style="flex:1;display:flex;flex-direction:column;gap:10px;">
-        <div class="stat-card"><div class="stat-label">Modal Terjual</div><div class="stat-value" style="color:var(--red)">${rp(hargaAsliTerjual)}</div></div>
-        <div class="stat-card"><div class="stat-label">Total Gratis</div><div class="stat-value" style="color:var(--yellow)">${rp(totalGratis)}</div></div>
+      <div class="stat-grid">
+        <div class="stat-card"><div class="stat-label">Pemasukan Manual</div><div class="stat-value" style="color:var(--green)">${rp(pemasukanManual)}</div></div>
         <div class="stat-card"><div class="stat-label">Pengeluaran Manual</div><div class="stat-value" style="color:var(--red)">${rp(pengeluaranManual)}</div></div>
       </div>
-    </div>
-    <div class="stat-grid">
-      <div class="stat-card full"><div class="stat-label">Penghasilan Bersih</div><div class="stat-value" style="color:${bersih>=0?'#6ddc6d':'#ff7c7c'};font-size:22px;">${rp(bersih)}</div></div>
+      <div class="stat-grid">
+        <div class="stat-card"><div class="stat-label">Modal Terjual</div><div class="stat-value" style="color:var(--red)">${rp(hargaAsliTerjual)}</div></div>
+        <div class="stat-card"><div class="stat-label">Total Gratis</div><div class="stat-value" style="color:var(--yellow)">${rp(totalGratis)}</div></div>
+      </div>
+      <div class="stat-grid">
+        <div class="stat-card full"><div class="stat-label">Penghasilan Bersih</div><div class="stat-value" style="color:${bersih>=0?'#6ddc6d':'#ff7c7c'};font-size:22px;">${rp(bersih)}</div></div>
+      </div>
     </div>`;
+
+  if (harianRincianOpen) {
+    const newHarianRincianEl = document.getElementById('harian-rincian');
+    const chevron = document.getElementById('harian-rincian-chevron');
+    if (newHarianRincianEl) newHarianRincianEl.style.display = 'block';
+    if (chevron) chevron.textContent = '▴';
+  }
 
   const renderManualItem = (m, color) => `
     <div class="card" style="margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;">
@@ -2311,6 +2332,15 @@ function renderUtangSummary() {
       </div>
     </div>`;
   renderUtangQuickList();
+}
+
+function toggleHarianRincian() {
+  const el = document.getElementById('harian-rincian');
+  const chevron = document.getElementById('harian-rincian-chevron');
+  if (!el) return;
+  const showing = el.style.display !== 'none';
+  el.style.display = showing ? 'none' : 'block';
+  if (chevron) chevron.textContent = showing ? '▾' : '▴';
 }
 
 function toggleBulananRincian() {
